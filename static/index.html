@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Context Hub | Real Plaza</title>
+<style>
+  :root {
+    color-scheme: light;
+    --canvas: #f4f6f8;
+    --surface: #ffffff;
+    --ink: #17212b;
+    --muted: #667384;
+    --line: #dce2e8;
+    --line-strong: #c7d0da;
+    --brand: #b51f2b;
+    --brand-dark: #8f1721;
+    --teal: #0c7b71;
+    --teal-soft: #e3f4f1;
+    --blue-soft: #eaf1fb;
+    --warning-soft: #fff4dd;
+    --danger-soft: #fbeaec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-width: 320px;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  button, input { font: inherit; }
+  .topbar {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 max(24px, calc((100vw - 1180px) / 2));
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand-mark {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    background: var(--brand);
+    color: white;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+  .brand-title { font-size: 15px; font-weight: 750; }
+  .brand-subtitle { color: var(--muted); font-size: 12px; }
+  .environment { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+  .environment::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
+  main { width: min(1180px, calc(100% - 48px)); margin: 32px auto 56px; }
+  .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+  .eyebrow { color: var(--brand); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: 0; margin: 0 0 5px; }
+  h1, h2, h3, p { margin-top: 0; }
+  h1 { margin-bottom: 5px; font-size: 25px; line-height: 1.2; letter-spacing: 0; }
+  h2 { margin: 0; font-size: 16px; letter-spacing: 0; }
+  .lead, .muted { color: var(--muted); }
+  .lead { margin: 0; max-width: 680px; }
+  .workflow { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .workflow-step { display: inline-flex; align-items: center; gap: 6px; }
+  .workflow-step strong { color: var(--ink); font-size: 11px; }
+  .workflow-divider { width: 24px; height: 1px; background: var(--line-strong); }
+  .section-label { margin: 30px 0 10px; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
+  .workspace-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+  .panel-header p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+  .panel-body { padding: 18px 22px 22px; }
+  .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+  .metric { padding: 16px 22px; border-right: 1px solid var(--line); }
+  .metric:last-child { border-right: 0; }
+  .metric-value { display: block; color: var(--ink); font-size: 22px; font-weight: 750; line-height: 1.1; }
+  .metric-label { color: var(--muted); font-size: 12px; }
+  form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .register-form { margin-bottom: 18px; }
+  input[type="text"] {
+    height: 38px;
+    flex: 1 1 260px;
+    min-width: 0;
+    padding: 8px 11px;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+  }
+  input[type="text"]:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(12, 123, 113, .12); }
+  #name { flex: 0 1 200px; }
+  button {
+    min-height: 38px;
+    padding: 8px 14px;
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    background: var(--brand);
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  button:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+  button.secondary { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+  button.secondary:hover { background: #f0f3f5; border-color: #b5c0ca; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; min-width: 650px; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 11px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); background: #fafbfc; font-size: 11px; font-weight: 750; letter-spacing: 0; text-transform: uppercase; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: #fbfcfd; }
+  td:last-child { white-space: nowrap; }
+  td:last-child button + button { margin-left: 6px; }
+  .badge { display: inline-flex; align-items: center; min-height: 22px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 750; }
+  .badge.listo { background: var(--teal-soft); color: #08695f; }
+  .badge.indexando { background: var(--warning-soft); color: #8a5a00; }
+  .badge.registrado { background: var(--blue-soft); color: #355d91; }
+  .badge.error { background: var(--danger-soft); color: #a3212b; }
+  .developer-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 16px; align-items: start; }
+  .subpanel { border: 1px solid var(--line); border-radius: 5px; padding: 18px; }
+  .subpanel h3 { margin-bottom: 5px; font-size: 14px; }
+  .subpanel > p { margin-bottom: 14px; color: var(--muted); font-size: 12px; }
+  .wiki-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #wikiSyncStatus { font-size: 12px; }
+  .reglas-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+  .regla-chip { padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 999px; color: #425061; cursor: pointer; font-size: 12px; background: #fff; }
+  .regla-chip:hover { background: #f0f5f5; border-color: var(--teal); color: #075e56; }
+  pre { max-height: 350px; margin: 16px 0 0; padding: 14px; overflow-y: auto; white-space: pre-wrap; border: 1px solid var(--line); border-radius: 4px; background: #fafbfc; color: #344150; font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .search-form { margin-top: 16px; }
+  #buscarResults { margin-top: 12px; }
+  #buscarResults p { margin: 0; padding: 10px 0; border-top: 1px solid var(--line); font-size: 12px; }
+  #auditResult { margin-top: 16px; }
+  .finding { margin-bottom: 8px; padding: 11px 12px; border-left: 3px solid var(--brand); background: #fff8f8; color: #3d3032; font-size: 13px; }
+  .muted { font-size: 12px; }
+  @media (max-width: 760px) {
+    .topbar { height: auto; min-height: 58px; padding: 13px 20px; }
+    .environment { display: none; }
+    main { width: min(100% - 32px, 1180px); margin-top: 22px; }
+    .page-heading { display: block; }
+    .workflow { margin-top: 16px; white-space: normal; }
+    .metrics { grid-template-columns: 1fr; }
+    .metric { border-right: 0; border-bottom: 1px solid var(--line); }
+    .metric:last-child { border-bottom: 0; }
+    .panel-header, .panel-body { padding-left: 16px; padding-right: 16px; }
+    .developer-grid { grid-template-columns: 1fr; }
+    #name { flex-basis: 100%; }
+    button { flex: 1 0 auto; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">RP</div>
+    <div>
+      <div class="brand-title">AI Context Hub</div>
+      <div class="brand-subtitle">Real Plaza · Gobierno de contexto de ingeniería</div>
+    </div>
+  </div>
+  <div class="environment">Entorno local activo</div>
+</header>
+<main>
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Centro de conocimiento técnico</p>
+      <h1>Contexto gobernado para decisiones de ingeniería</h1>
+      <p class="lead">Registra las fuentes de código, verifica su estado de indexación y ofrece a los equipos de desarrollo reglas y evidencia trazable.</p>
+    </div>
+    <div class="workflow" aria-label="Flujo de trabajo">
+      <span class="workflow-step"><strong>01</strong> Administración</span><span class="workflow-divider"></span><span class="workflow-step"><strong>02</strong> Desarrollo</span>
+    </div>
+  </div>
+
+  <p class="section-label">Administración de fuentes</p>
+  <section class="workspace-panel" aria-labelledby="reposTitle">
+    <div class="panel-header">
+      <div><h2 id="reposTitle">Repositorios indexados</h2><p>Control de las fuentes disponibles para los asistentes y las auditorías.</p></div>
+    </div>
+    <div class="metrics" aria-label="Resumen de repositorios">
+      <div class="metric"><span class="metric-value" id="repoCount">0</span><span class="metric-label">Repositorios registrados</span></div>
+      <div class="metric"><span class="metric-value" id="readyCount">0</span><span class="metric-label">Listos para consulta</span></div>
+      <div class="metric"><span class="metric-value" id="indexingCount">0</span><span class="metric-label">En proceso de indexación</span></div>
+    </div>
+    <div class="panel-body">
+      <form id="registerForm" class="register-form">
+        <input type="text" id="source" placeholder="URL Git o ruta local autorizada" required />
+        <input type="text" id="name" placeholder="Identificador del repositorio" />
+        <button type="submit">Registrar repositorio</button>
+      </form>
+      <div class="table-wrap">
+        <table id="reposTable">
+          <thead><tr><th>Repositorio</th><th>Estado</th><th>Nodos</th><th>Aristas</th><th>Acciones</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p class="section-label">Contexto para desarrollo</p>
+  <section class="developer-grid" aria-label="Herramientas para desarrolladores">
+    <div class="subpanel">
+      <h3>Lineamientos de arquitectura</h3>
+      <p>Arquetipo Microservicio · Fuente oficial sincronizada</p>
+      <div class="wiki-actions"><button class="secondary" id="syncWikiBtn">Sincronizar fuente</button><span class="muted" id="wikiSyncStatus"></span></div>
+      <div class="reglas-list" id="reglasList"></div>
+      <pre id="reglaContent" style="display:none"></pre>
+      <form id="buscarForm" class="search-form">
+        <input type="text" id="buscarQuery" placeholder="Buscar una regla o convención" />
+        <button type="submit" class="secondary">Buscar</button>
+      </form>
+      <div id="buscarResults"></div>
+    </div>
+    <div class="subpanel">
+      <h3>Auditoría de módulo</h3>
+      <p>Contrasta código indexado y lineamientos oficiales para priorizar incumplimientos.</p>
+      <form id="auditForm">
+        <input type="text" id="auditRepo" placeholder="Repositorio registrado" required />
+        <input type="text" id="auditModulo" placeholder="Módulo a evaluar" required />
+        <button type="submit">Ejecutar auditoría</button>
+      </form>
+      <div id="auditResult"></div>
+    </div>
+  </section>
+</main><script>
+const api = (path, opts) => fetch(path, opts).then(async r => {
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+});
+
+function textElement(tag, value, className) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  element.textContent = String(value ?? '');
+  return element;
+}
+
+async function refreshRepos() {
+  const repos = await api('/repos');
+  document.getElementById('repoCount').textContent = repos.length;
+  document.getElementById('readyCount').textContent = repos.filter(repo => repo.status === 'listo').length;
+  document.getElementById('indexingCount').textContent = repos.filter(repo => repo.status === 'indexando').length;
+  const tbody = document.querySelector('#reposTable tbody');
+  tbody.replaceChildren();
+  const rowsByName = new Map();
+  for (const repo of repos) {
+    const tr = document.createElement('tr');
+    const nameCell = textElement('td', repo.name);
+    const statusCell = document.createElement('td');
+    statusCell.appendChild(textElement('span', repo.status, `badge ${repo.status}`));
+    const nodesCell = textElement('td', repo.nodes ?? '-');
+    const edgesCell = textElement('td', repo.edges ?? '-');
+    const actionsCell = document.createElement('td');
+    const graphButton = textElement('button', 'Ver grafo', 'secondary');
+    graphButton.addEventListener('click', () => {
+      window.open(`/repos/${encodeURIComponent(repo.name)}/graph-ui`, '_blank', 'noopener');
+    });
+    const removeButton = textElement('button', 'Quitar', 'secondary');
+    removeButton.title = 'Elimina el registro y el índice; conserva el clon local.';
+    removeButton.addEventListener('click', () => deleteRepo(repo.name));
+    const deleteCloneButton = textElement('button', 'Eliminar clon', 'secondary');
+    deleteCloneButton.title = 'Elimina también la copia local administrada por el Hub.';
+    deleteCloneButton.addEventListener('click', () => deleteRepo(repo.name, true));
+    actionsCell.append(graphButton, removeButton, deleteCloneButton);
+    tr.append(nameCell, statusCell, nodesCell, edgesCell, actionsCell);
+    tbody.appendChild(tr);
+    rowsByName.set(repo.name, tr);
+  }
+  for (const repo of repos.filter(r => r.status === 'listo')) {
+    try {
+      const st = await api(`/repos/${encodeURIComponent(repo.name)}/status`);
+      const nodes = st.cbm_status?.nodes ?? st.cbm_status?.node_count;
+      const edges = st.cbm_status?.edges ?? st.cbm_status?.edge_count;
+      if (nodes !== undefined) {
+        const row = rowsByName.get(repo.name);
+        if (row) { row.children[2].textContent = nodes; row.children[3].textContent = edges; }
+      }
+    } catch (e) { /* status aun no disponible */ }
+  }
+}
+
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const source = document.getElementById('source').value;
+  const name = document.getElementById('name').value || undefined;
+  await api('/repos', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({source, name}) });
+  document.getElementById('source').value = '';
+  document.getElementById('name').value = '';
+  refreshRepos();
+});
+
+async function deleteRepo(name, deleteClone = false) {
+  if (deleteClone && !window.confirm(`Se eliminará el índice, el registro y el clon local de "${name}". Esta acción no se puede deshacer.`)) {
+    return;
+  }
+  await api(`/repos/${encodeURIComponent(name)}?delete_clone=${deleteClone}`, { method: 'DELETE' });
+  refreshRepos();
+}
+
+async function refreshReglas() {
+  const reglas = await api('/wiki/reglas');
+  const list = document.getElementById('reglasList');
+  list.replaceChildren();
+  for (const r of reglas) {
+    const chip = textElement('span', r.archivo, 'regla-chip');
+    chip.onclick = async () => {
+      const detalle = await api(`/wiki/reglas/${encodeURIComponent(r.capa)}`);
+      const pre = document.getElementById('reglaContent');
+      pre.style.display = 'block';
+      pre.textContent = detalle.contenido;
+    };
+    list.appendChild(chip);
+  }
+}
+
+document.getElementById('syncWikiBtn').addEventListener('click', async () => {
+  const status = document.getElementById('wikiSyncStatus');
+  status.textContent = 'Sincronizando...';
+  try {
+    const r = await api('/wiki/sync', { method: 'POST' });
+    status.textContent = `${r.reglas_indexadas} reglas indexadas (${r.pulled})`;
+    refreshReglas();
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+});
+
+document.getElementById('buscarForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = document.getElementById('buscarQuery').value;
+  const results = await api('/wiki/buscar?q=' + encodeURIComponent(q));
+  const div = document.getElementById('buscarResults');
+  div.replaceChildren();
+  if (!results.length) {
+    div.appendChild(textElement('p', 'Sin resultados.', 'muted'));
+    return;
+  }
+  for (const result of results) {
+    const paragraph = document.createElement('p');
+    paragraph.append(textElement('b', result.archivo), document.createElement('br'));
+    paragraph.appendChild(textElement('span', result.snippet, 'muted'));
+    div.appendChild(paragraph);
+  }
+});
+
+document.getElementById('auditForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const repo = document.getElementById('auditRepo').value;
+  const modulo = document.getElementById('auditModulo').value;
+  const div = document.getElementById('auditResult');
+  div.replaceChildren(textElement('p', 'Auditando...', 'muted'));
+  try {
+    const r = await api('/audit', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({repo, modulo}) });
+    div.replaceChildren();
+    const findings = r.findings || [];
+    if (!findings.length) {
+      div.appendChild(textElement('p', 'Sin hallazgos.', 'muted'));
+      return;
+    }
+    for (const finding of findings) {
+      const item = document.createElement('div');
+      item.className = 'finding';
+      const location = finding.linea ? `${finding.archivo}:${finding.linea}` : finding.archivo;
+      item.append(textElement('b', location), document.createTextNode(` - ${finding.regla_violada || ''}`), document.createElement('br'));
+      item.append(document.createTextNode(finding.descripcion || ''), document.createElement('br'));
+      item.appendChild(textElement('span', `Fix sugerido: ${finding.fix_sugerido || '-'}`, 'muted'));
+      div.appendChild(item);
+    }
+  } catch (err) {
+    div.replaceChildren(textElement('p', `Error: ${err.message}`, 'muted'));
+  }
+});
+
+refreshRepos();
+refreshReglas();
+setInterval(refreshRepos, 4000);
+</script>
+</body>
+</html>
