@@ -24,8 +24,15 @@ class Settings(BaseSettings):
 
     # Motor de grafo (cbm)
     cbm_bin: str = _default_cbm_bin()
+    # Puerto donde cbm sirve su UI (loopback). En el contenedor se mueve a 9750
+    # porque el relay socat toma el externo. En local sin Docker, cbm escucha
+    # directo acá y no hay relay.
     cbm_ui_port: int = 9749
-    graph_ui_public_url: str = ""  # se resuelve con cbm_ui_port si queda vacío
+    # Puerto público/externo por el que se llega a la UI del grafo (el que
+    # publica Docker/Dokploy). En local == cbm_ui_port; en el contenedor es 9749
+    # mientras cbm queda en 9750 detrás del relay.
+    cbm_ui_external_port: int = 9749
+    graph_ui_public_url: str = ""  # si queda vacío, se arma con el puerto externo
 
     # Timeouts de cbm (segundos). El indexado de un repo grande tarda mucho más
     # que una consulta puntual (search/arch/snippet), por eso van separados.
@@ -45,7 +52,7 @@ class Settings(BaseSettings):
 
     @property
     def graph_ui_url(self) -> str:
-        return self.graph_ui_public_url or f"http://localhost:{self.cbm_ui_port}"
+        return self.graph_ui_public_url or f"http://localhost:{self.cbm_ui_external_port}"
 
 
 settings = Settings()
