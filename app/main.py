@@ -189,7 +189,7 @@ def repo_graph_ui(name: str):
         raise HTTPException(404, "Repo no indexado todavía")
     cbm.ensure_ui_running(CBM_UI_PORT)
     base = GRAPH_UI_PUBLIC_URL.rstrip("/")
-    url = f"{base}/?project={quote(repo['cbm_project'])}"
+    url = f"{base}/?tab=graph&project={quote(repo['cbm_project'])}"
     return RedirectResponse(url)
 
 
