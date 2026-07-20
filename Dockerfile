@@ -47,8 +47,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Código de la app
 COPY app ./app
 COPY static ./static
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Usuario no privilegiado. HOME=/app/data para que TODO el estado (nuestras .db
 # + el store del grafo que cbm guarda bajo $HOME) viva en un solo volumen y
@@ -66,5 +64,8 @@ EXPOSE 8000 9749
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD .venv/bin/python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD [".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Relay socat (publica en 0.0.0.0 la UI del grafo que cbm bindea a loopback) en
+# segundo plano, y luego uvicorn toma el proceso principal. Forma shell para
+# poder lanzar ambos sin un script aparte.
+CMD socat "TCP-LISTEN:${CBM_UI_EXTERNAL_PORT},fork,reuseaddr" "TCP:127.0.0.1:${CBM_UI_PORT}" & \
+    exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000

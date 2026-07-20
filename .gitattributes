@@ -1,6 +1,4 @@
-# Los scripts que corren dentro del contenedor Linux DEBEN conservar saltos de
-# línea LF. Con CRLF, el shebang se lee como "/bin/sh\r" y el contenedor falla
-# con "bad interpreter". Esto lo fuerza sin importar el core.autocrlf del clon.
-*.sh            text eol=lf
-docker-entrypoint.sh text eol=lf
+# El Dockerfile corre en Linux y su CMD lanza comandos de shell; con CRLF esos
+# comandos se corromperían. Fuerza LF sin importar el core.autocrlf del clon.
 Dockerfile      text eol=lf
+*.sh            text eol=lf
