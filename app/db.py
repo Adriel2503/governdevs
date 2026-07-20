@@ -3,11 +3,19 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "repos.db"
+from .config import settings
+
+DB_PATH = Path(settings.data_dir) / "repos.db"
 
 
 def _conn() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
+    # busy_timeout (por conexión) hace que una escritura/lectura espere hasta 5s
+    # a que se libere el lock en vez de fallar al instante; WAL (persistente en
+    # el archivo) permite lecturas concurrentes sin bloquear al escritor.
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS repos (

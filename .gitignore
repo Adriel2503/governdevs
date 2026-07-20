@@ -1,13 +1,34 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Virtual environments
-.venv
-# Runtime data and cloned repositories
+# Entorno virtual (uv)
+.venv/
+
+# Config local con secretos (.env.example SÍ se versiona)
+.env
+
+# Datos de runtime — se regeneran/persisten por volumen en Dokploy.
+# data/      -> repos.db (estado) + wiki_index.db (se reconstruye desde wiki_data/)
+# workspace/ -> clones temporales de repos (se autoborran tras indexar)
+# Ambas carpetas las recrea el código al arrancar.
+data/
 workspace/
-*.db
+
+# Lineamientos oficiales — NO se versionan en este repo (contenido interno de
+# Real Plaza). Deben proveerse aparte en el deploy (volumen o copia al construir
+# la imagen). Ver WIKI_MICROSERVICIO_DIR en app/config.py.
+wiki_data/
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

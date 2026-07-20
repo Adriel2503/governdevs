@@ -16,9 +16,9 @@ El punto de extensión para Escala 2 (permisos por repo vía Azure DevOps) es
 
 from fastmcp import FastMCP
 
-import cbm
-import repos_db
-import wiki
+from . import db as repos_db
+from . import graph_engine as cbm
+from . import reglas as wiki
 
 mcp = FastMCP(
     name="realplaza-context-hub",
@@ -89,7 +89,10 @@ def trace_path(repo: str, function_name: str, direction: str = "both") -> dict:
 @mcp.tool
 def get_code_snippet(repo: str, qualified_name: str) -> dict:
     """Trae el código fuente real de un símbolo (qualified_name viene de
-    search_graph), con archivo:línea de procedencia verificable."""
+    search_graph), con archivo:línea de procedencia verificable. Nota: solo
+    funciona mientras el clon del repo siga en disco — si ya se indexó y se
+    borró el working tree (comportamiento por defecto para repos por URL),
+    devuelve "(source not available)"."""
     project = _resolve_cbm_project(repo)
     return cbm.get_code_snippet(project, qualified_name)
 

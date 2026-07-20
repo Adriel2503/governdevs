@@ -1,12 +1,14 @@
 [project]
 name = "context-hub"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI Context Hub — grafo de código (codebase-memory-mcp) + lineamientos oficiales de arquitectura, servidos a agentes IA vía REST y MCP."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "anthropic>=0.116.0",
-    "fastapi>=0.139.0",
-    "fastmcp>=3.4.4",
-    "uvicorn[standard]>=0.51.0",
+    "anthropic==0.116.0",
+    "fastapi==0.139.0",
+    "fastmcp==3.4.4",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    "uvicorn[standard]==0.51.0",
 ]

@@ -254,15 +254,19 @@ dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
     { name = "fastmcp" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.116.0" },
-    { name = "fastapi", specifier = ">=0.139.0" },
-    { name = "fastmcp", specifier = ">=3.4.4" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.51.0" },
+    { name = "anthropic", specifier = "==0.116.0" },
+    { name = "fastapi", specifier = "==0.139.0" },
+    { name = "fastmcp", specifier = "==3.4.4" },
+    { name = "pydantic", specifier = "==2.13.4" },
+    { name = "pydantic-settings", specifier = "==2.14.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = "==0.51.0" },
 ]
 
 [[package]]

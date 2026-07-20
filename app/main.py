@@ -7,11 +7,11 @@ Un solo proceso FastAPI que:
   - /audit junta grafo + lineamientos para auditar un módulo con Claude
 
 cbm y la wiki quedan totalmente detrás de esta capa: el frontend nunca los
-toca directo. Si el motor de grafo cambia mañana, solo cbm.py se reescribe.
+toca directo. Si el motor de grafo cambia mañana, solo graph_engine.py se
+reescribe.
 """
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -19,23 +19,31 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import anthropic
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import cbm
-import repos_db
-import wiki
-from mcp_server import mcp as mcp_server
+from . import db as repos_db
+from . import graph_engine as cbm
+from . import reglas as wiki
+from .config import settings
+from .mcp_server import mcp as mcp_server
 
 # Capas de lineamiento que solemos cruzar en una auditoría de módulo CQRS
 _CAPAS_AUDITORIA = ["endpoints", "ruteo", "handlers", "queries", "validators", "custom-exceptions"]
 
-WORKSPACE = Path(__file__).parent / "workspace"
+WORKSPACE = Path(settings.workspace_dir)
 WORKSPACE.mkdir(exist_ok=True)
 
-CBM_UI_PORT = 9749
+# La UI 3D la sirve el propio binario cbm en su propio puerto dentro del
+# contenedor. Redirigir al navegador del cliente a "localhost:<puerto>" solo
+# funciona en desarrollo local (el navegador ahí SÍ es la misma máquina que el
+# servidor); en producción el cliente está en otra red y "localhost" apunta a
+# su propia laptop. GRAPH_UI_PUBLIC_URL debe ser la URL pública desde la que
+# Dokploy expone ese puerto (dominio/puerto propio mapeado al mismo contenedor).
+CBM_UI_PORT = settings.cbm_ui_port
+GRAPH_UI_PUBLIC_URL = settings.graph_ui_url
 
 # FastMCP.http_app() devuelve una sub-app Starlette con su propio lifespan
 # (arranca el session manager de Streamable HTTP). FastAPI solo invoca UN
@@ -52,6 +60,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Context Hub", lifespan=lifespan)
+
+
+# El sub-app MCP se monta bajo /mcp, y por cómo Starlette recorta el prefijo del
+# Mount solo responde con la barra final (/mcp/). Para poder registrar el MCP con
+# la URL estándar /mcp, redirigimos /mcp → /mcp/ con 307 (preserva método y body,
+# a diferencia de 301/302). Debe ir ANTES del mount para ganar el match exacto;
+# /mcp/ y /mcp/... siguen cayendo directo en el mount. Cubre GET/POST/DELETE
+# porque el transporte Streamable HTTP de MCP usa los tres sobre el mismo endpoint.
+@app.api_route("/mcp", methods=["GET", "POST", "DELETE"], include_in_schema=False)
+def _mcp_trailing_slash():
+    return RedirectResponse("/mcp/", status_code=307)
+
+
 app.mount("/mcp", mcp_asgi_app)
 
 
@@ -74,8 +95,15 @@ def _derive_name(source: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "-", stem).lower() or "repo"
 
 
-def _index_repo_job(name: str, local_path: str):
-    """Corre en background: index_repository puede tardar en repos grandes."""
+def _index_repo_job(name: str, local_path: str, delete_clone_after: bool = False):
+    """Corre en background: index_repository puede tardar en repos grandes.
+
+    Solo nos interesa el grafo, no el código clonado: si delete_clone_after es
+    True (repo registrado por URL), el working tree se borra apenas cbm termina
+    de indexar. cbm relee el código fuente del disco en cada get_code_snippet
+    (no lo persiste en su propio store) — por diseño, para estos repos esa tool
+    deja de devolver "source" una vez borrado el clon; el grafo (arquitectura,
+    search_graph, trace_path) sigue funcionando porque eso sí vive en el store."""
     try:
         repos_db.set_status(name, "indexando")
         cbm.index_repository(local_path)
@@ -91,6 +119,9 @@ def _index_repo_job(name: str, local_path: str):
         repos_db.set_status(name, "listo", cbm_project=cbm_project)
     except cbm.CbmError as e:
         repos_db.set_status(name, "error", error=str(e))
+    finally:
+        if delete_clone_after:
+            shutil.rmtree(local_path, ignore_errors=True)
 
 
 @app.post("/repos")
@@ -116,7 +147,7 @@ def register_repo(req: RegisterRepoRequest, background_tasks: BackgroundTasks):
             raise HTTPException(400, f"La ruta local no existe: {req.source}")
 
     repos_db.upsert(name, req.source, str(local_path), status="registrado")
-    background_tasks.add_task(_index_repo_job, name, str(local_path))
+    background_tasks.add_task(_index_repo_job, name, str(local_path), _is_git_url(req.source))
 
     return {"name": name, "local_path": str(local_path), "status": "registrado"}
 
@@ -152,40 +183,16 @@ def repo_graph_ui(name: str):
     """Redirige a la UI 3D que el propio binario cbm sirve (no reimplementamos
     visualización). Se asegura de que el proceso siga vivo antes de redirigir."""
     cbm.ensure_ui_running(CBM_UI_PORT)
-    return RedirectResponse(f"http://localhost:{CBM_UI_PORT}")
-
-
-def _managed_clone_path(repo: dict) -> Path | None:
-    """Devuelve únicamente un clon Git directo bajo workspace que sea seguro borrar."""
-    if not _is_git_url(repo["source"]):
-        return None
-
-    try:
-        workspace = WORKSPACE.resolve()
-        clone_path = Path(repo["local_path"]).resolve()
-    except OSError:
-        return None
-
-    if clone_path.parent != workspace or not clone_path.is_dir() or clone_path.is_symlink():
-        return None
-    return clone_path
+    return RedirectResponse(GRAPH_UI_PUBLIC_URL)
 
 
 @app.delete("/repos/{name}")
-def delete_repo(name: str, delete_clone: bool = Query(False)):
+def delete_repo(name: str):
+    """El working tree clonado ya se borró al terminar de indexar (solo nos
+    interesa el grafo) — esto solo limpia el proyecto de cbm y el registro."""
     repo = repos_db.get(name)
     if repo is None:
         raise HTTPException(404, "Repo no registrado")
-
-    clone_path = None
-    if delete_clone:
-        clone_path = _managed_clone_path(repo)
-        if clone_path is None:
-            raise HTTPException(400, "Este repositorio no tiene un clon administrado que se pueda borrar")
-        try:
-            shutil.rmtree(clone_path)
-        except OSError as e:
-            raise HTTPException(500, f"No se pudo borrar el clon local: {e}") from e
 
     if repo["cbm_project"]:
         try:
@@ -193,7 +200,7 @@ def delete_repo(name: str, delete_clone: bool = Query(False)):
         except cbm.CbmError:
             pass
     repos_db.delete(name)
-    return {"deleted": name, "deleted_clone": clone_path is not None}
+    return {"deleted": name}
 
 
 # --- Lineamientos (wiki) ---------------------------------------------------
@@ -279,7 +286,7 @@ def audit_modulo(req: AuditRequest):
     if repo is None or not repo["cbm_project"]:
         raise HTTPException(404, "Repo no registrado o aún no indexado")
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if not settings.anthropic_api_key:
         raise HTTPException(500, "Falta ANTHROPIC_API_KEY en el entorno del servidor")
 
     snippets = _reunir_snippets_modulo(repo["cbm_project"], req.modulo)
@@ -327,4 +334,4 @@ Responde EXCLUSIVAMENTE con un JSON: {{"findings": [{{"archivo": "...", "linea":
     return {"findings": data.get("findings", [])}
 
 
-app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
+app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="static")

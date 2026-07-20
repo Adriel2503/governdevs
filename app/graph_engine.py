@@ -14,9 +14,9 @@ import shutil
 import socket
 import subprocess
 
-CBM_BIN = os.path.expandvars(
-    r"%LOCALAPPDATA%\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"
-)
+from .config import settings
+
+CBM_BIN = settings.cbm_bin
 
 # Referencia global al proceso de la UI 3D — debe mantenerse viva o el pipe de
 # stdin se cierra y el binario se apaga (interpreta EOF en stdin como "mi host
@@ -29,19 +29,31 @@ class CbmError(RuntimeError):
     """El binario cbm devolvió un error o una salida no parseable."""
 
 
-def _run(tool: str, payload: dict | None = None) -> dict:
+def _run(tool: str, payload: dict | None = None, timeout: int | None = None) -> dict:
     args = [CBM_BIN, "cli", tool]
     if payload is not None:
         args.append(json.dumps(payload))
 
-    result = subprocess.run(
-        args,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=120,
-        stdin=subprocess.DEVNULL,
-    )
+    timeout = timeout or settings.cbm_cli_timeout
+
+    # Traducimos TODA forma de fallo de cbm a CbmError, para que el único
+    # manejador aguas arriba (except CbmError en _index_repo_job) las capture y
+    # el repo pase a "error" en vez de colgarse en "indexando".
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise CbmError(f"cbm cli {tool} excedió el tiempo límite de {timeout}s") from e
+    except FileNotFoundError as e:
+        raise CbmError(f"No se encontró el binario cbm en '{CBM_BIN}' (revisa CBM_BIN)") from e
+    except OSError as e:
+        raise CbmError(f"cbm cli {tool} no se pudo ejecutar: {e}") from e
 
     if result.returncode != 0:
         raise CbmError(
@@ -59,7 +71,8 @@ def is_available() -> bool:
 
 
 def index_repository(repo_path: str) -> dict:
-    return _run("index_repository", {"repo_path": repo_path})
+    # Indexar es la operación larga: timeout extendido para repos grandes.
+    return _run("index_repository", {"repo_path": repo_path}, timeout=settings.cbm_index_timeout)
 
 
 def list_projects() -> list[dict]:

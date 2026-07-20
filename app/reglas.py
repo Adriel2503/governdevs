@@ -1,47 +1,44 @@
-"""Capa de lineamientos: la Wiki-Arquitectura.wiki (repo git ya clonado por el
-usuario) servida verbatim, más un índice FTS5 para búsqueda transversal.
+"""Capa de lineamientos: las reglas oficiales de Arquetipos/Microservicio,
+bundleadas como archivos dentro de este repo (wiki_data/), servidas verbatim
+más un índice FTS5 para búsqueda transversal.
 
 Por directiva del jefe, solo indexamos Lineamientos/Desarrollo/Arquetipos/Microservicio.
 Las reglas NO se resumen ni se pasan por LLM: son la norma oficial, se sirven tal cual.
+
+Actualizar contenido: pisar los .md en wiki_data/Microservicio (copiados a mano
+o por CI desde la wiki fuente) y llamar a /wiki/sync para reindexar. No hay git
+en runtime — la wiki viaja congelada dentro de la imagen/deploy.
 """
 
-import os
 import sqlite3
-import subprocess
 from pathlib import Path
 
-WIKI_REPO = Path(
-    r"C:\Users\Experis\Documents\Real_Plaza\optimizar_ia\repositorios\Wiki-Arquitectura.wiki"
-)
-MICROSERVICIO_DIR = WIKI_REPO / "Lineamientos" / "Desarrollo" / "Arquetipos" / "Microservicio"
+from .config import settings
 
-DB_PATH = Path(__file__).parent / "wiki_index.db"
+MICROSERVICIO_DIR = Path(settings.wiki_microservicio_dir)
+DB_PATH = Path(settings.data_dir) / "wiki_index.db"
 
 
 class WikiError(RuntimeError):
     pass
 
 
+def _connect() -> sqlite3.Connection:
+    """Conexión SQLite endurecida: busy_timeout + WAL, igual que en db.py — el
+    reindexado (sync) escribe mientras alguien puede estar buscando/listando."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA journal_mode = WAL")
+    return conn
+
+
 def sync() -> dict:
-    """git pull del clon existente de la wiki. No clona: el usuario ya la clonó
-    (login Azure DevOps interactivo), nosotros solo actualizamos."""
-    if not WIKI_REPO.is_dir():
-        raise WikiError(f"No existe el clon de la wiki en {WIKI_REPO}")
-
-    result = subprocess.run(
-        ["git", "pull", "--ff-only"],
-        cwd=WIKI_REPO,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        stdin=subprocess.DEVNULL,
-        timeout=60,
-    )
-    if result.returncode != 0:
-        raise WikiError(f"git pull falló: {result.stderr.strip()}")
-
+    """Reindexa las reglas bundleadas en disco (sin git: el contenido viaja
+    congelado dentro del deploy; actualizarlo requiere reemplazar los .md y
+    redeployar, o llamar a este endpoint tras pisarlos a mano)."""
     count = _reindex()
-    return {"pulled": result.stdout.strip(), "reglas_indexadas": count}
+    return {"reglas_indexadas": count}
 
 
 def _slug_capa(filename: str) -> str:
@@ -55,7 +52,7 @@ def _reindex() -> int:
     if not MICROSERVICIO_DIR.is_dir():
         raise WikiError(f"No existe la carpeta esperada: {MICROSERVICIO_DIR}")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     conn.execute("DROP TABLE IF EXISTS reglas")
     conn.execute(
         """
@@ -88,7 +85,7 @@ def _ensure_index():
 
 def list_reglas() -> list[dict]:
     _ensure_index()
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     rows = conn.execute(
         "SELECT capa, archivo, ruta_relativa, length(contenido) FROM reglas ORDER BY ruta_relativa"
     ).fetchall()
@@ -105,7 +102,7 @@ def get_regla(capa: str) -> dict | None:
     tutorial Y como regla oficial), prioriza las de Lineamientos-de-desarrollo/
     — esas son la norma; el resto son tutoriales paso a paso."""
     _ensure_index()
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     for where in ("capa = ?", "capa LIKE ?"):
         param = capa if where == "capa = ?" else f"%{capa}%"
         row = conn.execute(
@@ -128,7 +125,7 @@ def get_regla(capa: str) -> dict | None:
 def buscar(query: str, limit: int = 5) -> list[dict]:
     """Búsqueda FTS5 sobre las reglas. Devuelve fragmentos con snippet resaltado."""
     _ensure_index()
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     try:
         rows = conn.execute(
             """
