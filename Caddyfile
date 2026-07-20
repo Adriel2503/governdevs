@@ -1,0 +1,35 @@
+# Proxy de la UI del grafo de cbm.
+#
+# cbm sirve su UI atada a 127.0.0.1 y ademas valida el header Host: solo acepta
+# "localhost"/"127.0.0.1" y responde 403 {"error":"forbidden host"} a cualquier
+# otro (p. ej. el dominio publico que reenvia Traefik/Dokploy).
+#
+# Este proxy resuelve las dos cosas a la vez:
+#   1) escucha en 0.0.0.0:${CBM_UI_EXTERNAL_PORT} (Traefik llega por la red del
+#      contenedor, no por loopback), y
+#   2) reescribe Host -> localhost al reenviar a cbm (127.0.0.1:${CBM_UI_PORT}),
+#      con lo que cbm deja de rechazar el pedido.
+# reverse_proxy propaga los upgrades de WebSocket de forma transparente.
+
+{
+	# La UI vive detras de Traefik (que ya termina TLS y rutea el dominio);
+	# aca no queremos que Caddy intente HTTPS ni escriba estado en disco.
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:{$CBM_UI_EXTERNAL_PORT:9749} {
+	# --- Auth opcional (preparada, apagada por defecto) ------------------
+	# Para proteger el grafo con usuario/clave sin depender todavia del
+	# servicio de identidad: descomenta el bloque y define GRAPH_PASS_HASH
+	# en Dokploy (generalo con: caddy hash-password).
+	# basic_auth {
+	# 	{$GRAPH_USER:admin} {$GRAPH_PASS_HASH}
+	# }
+	# ---------------------------------------------------------------------
+
+	reverse_proxy 127.0.0.1:{$CBM_UI_PORT:9750} {
+		header_up Host localhost
+	}
+}

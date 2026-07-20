@@ -1,4 +1,5 @@
 # El Dockerfile corre en Linux y su CMD lanza comandos de shell; con CRLF esos
 # comandos se corromperían. Fuerza LF sin importar el core.autocrlf del clon.
 Dockerfile      text eol=lf
+Caddyfile       text eol=lf
 *.sh            text eol=lf
