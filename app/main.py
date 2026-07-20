@@ -17,6 +17,7 @@ import shutil
 import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import quote
 
 import anthropic
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -181,9 +182,15 @@ def repo_architecture(name: str):
 @app.get("/repos/{name}/graph-ui")
 def repo_graph_ui(name: str):
     """Redirige a la UI 3D que el propio binario cbm sirve (no reimplementamos
-    visualización). Se asegura de que el proceso siga vivo antes de redirigir."""
+    visualización). Deep-link: la SPA de cbm lee ?project=<slug> para abrir ese
+    grafo directo, en vez de caer en la home. Asegura el proceso vivo antes."""
+    repo = repos_db.get(name)
+    if repo is None or not repo["cbm_project"]:
+        raise HTTPException(404, "Repo no indexado todavía")
     cbm.ensure_ui_running(CBM_UI_PORT)
-    return RedirectResponse(GRAPH_UI_PUBLIC_URL)
+    base = GRAPH_UI_PUBLIC_URL.rstrip("/")
+    url = f"{base}/?project={quote(repo['cbm_project'])}"
+    return RedirectResponse(url)
 
 
 @app.delete("/repos/{name}")
