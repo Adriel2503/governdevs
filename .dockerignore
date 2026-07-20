@@ -1,6 +1,31 @@
-.venv
+# Python
 __pycache__
-*.pyc
-workspace/
-*.db
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov/
+
+# Entorno virtual (la imagen crea el suyo con uv sync)
+.venv
+venv
+
+# Config local / git / meta
+.env
 .git
+.gitignore
+.dockerignore
+Dockerfile
+compose.yaml
+docker-compose*.yaml
+*.md
+
+# Estado de runtime — se persiste por volumen, no va en la imagen
+data/
+workspace/
+
+# Contenido confidencial de Real Plaza — se provee por volumen de solo-lectura
+# en runtime; NUNCA se hornea en la imagen
+wiki_data/

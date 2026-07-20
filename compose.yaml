@@ -1,0 +1,33 @@
+services:
+  context-hub:
+    build:
+      context: .
+    ports:
+      - "8000:8000"   # app: web + REST + MCP
+      - "9749:9749"   # grafo 3D (UI que sirve el binario cbm)
+    env_file:
+      # Opcional: para local no hace falta. En Dokploy las env vars se cargan
+      # desde la UI del panel.
+      - path: .env
+        required: false
+    environment:
+      # URL pública desde la que se accede al grafo 3D. En local con los puertos
+      # publicados, localhost funciona; en Dokploy poné el dominio real del 9749.
+      GRAPH_UI_PUBLIC_URL: ${GRAPH_UI_PUBLIC_URL:-http://localhost:9749}
+    volumes:
+      # Todo el estado (repos.db, wiki_index.db y el store del grafo de cbm bajo
+      # $HOME=/app/data) en un volumen nombrado que sobrevive redeploys.
+      - context_hub_data:/app/data
+      # Lineamientos confidenciales de Real Plaza: se montan en runtime, de
+      # solo-lectura, y NO viajan dentro de la imagen. Apuntá el origen a donde
+      # tengas los .md (acá se asume ./wiki_data en el host).
+      - ./wiki_data:/app/wiki_data:ro
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  context_hub_data:

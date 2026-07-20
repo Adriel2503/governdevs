@@ -334,4 +334,11 @@ Responde EXCLUSIVAMENTE con un JSON: {{"findings": [{{"archivo": "...", "linea":
     return {"findings": data.get("findings", [])}
 
 
+@app.get("/health", include_in_schema=False)
+def health():
+    """Liveness para el HEALTHCHECK del contenedor. No toca cbm ni la DB —
+    solo confirma que el proceso responde."""
+    return {"status": "ok"}
+
+
 app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="static")
