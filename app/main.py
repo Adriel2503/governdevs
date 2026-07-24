@@ -14,6 +14,7 @@ reescribe.
 import json
 import re
 import secrets
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -394,13 +395,37 @@ def wiki_import_git(req: ImportGitRequest):
 
 @app.post("/wiki/import/zip")
 async def wiki_import_zip(file: UploadFile = File(...)):
-    """Paso 1 (ZIP): descomprime el archivo subido a una carpeta temporal y
-    devuelve el árbol de carpetas para elegir la raíz a indexar."""
-    data = await file.read()
+    """Paso 1 (ZIP): extrae los .md del archivo subido a una carpeta temporal y
+    devuelve el árbol de carpetas para elegir la raíz a indexar.
+
+    La subida se escribe a disco POR PARTES. Antes se hacía `await file.read()`,
+    que carga el archivo entero en memoria: con un export de wiki de cientos de
+    MB eso es un pico de RAM en un servidor que además corre Postgres y el motor
+    de grafo. Así el consumo es constante sin importar el tamaño, y pasado el
+    límite se corta con un 413 explícito en vez de morir de formas raras.
+    """
+    limite = settings.max_upload_mb * 1024 * 1024
+    subidas = WORKSPACE / "uploads"
+    subidas.mkdir(parents=True, exist_ok=True)
+    tmp = subidas / f"{uuid.uuid4().hex}.zip"
+
     try:
-        return importador.scan_zip(data, fuente=file.filename or "zip")
+        total = 0
+        with tmp.open("wb") as salida:
+            while chunk := await file.read(1024 * 1024):
+                total += len(chunk)
+                if total > limite:
+                    raise HTTPException(
+                        413,
+                        f"El archivo supera el límite de {settings.max_upload_mb} MB. "
+                        "Solo se indexan los .md: podés subir un ZIP sin .git ni adjuntos.",
+                    )
+                salida.write(chunk)
+        return importador.scan_zip(tmp, fuente=file.filename or "zip")
     except importador.ImportadorError as e:
         raise HTTPException(400, str(e))
+    finally:
+        tmp.unlink(missing_ok=True)  # el ZIP no se conserva: ya se extrajeron los .md
 
 
 @app.post("/wiki/import/index")

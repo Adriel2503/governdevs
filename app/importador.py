@@ -87,18 +87,46 @@ def scan_git(url: str, token: str | None = None) -> dict:
     return _resultado_scan(import_id, dest, fuente=url)
 
 
-def scan_zip(file_bytes: bytes, fuente: str = "zip") -> dict:
-    """Descomprime un ZIP a una carpeta temporal, con protección básica contra
-    zip-slip (entradas que escapen del destino)."""
+def _es_markdown_util(info: zipfile.ZipInfo) -> bool:
+    """Solo interesan los .md: es lo único que se indexa. Un export de wiki suele
+    venir con .git y adjuntos (imágenes, GIFs, diagramas) que pesan órdenes de
+    magnitud más y se descartarían igual después."""
+    if info.is_dir() or not info.filename.lower().endswith(".md"):
+        return False
+    partes = info.filename.replace("\\", "/").split("/")
+    return ".git" not in partes
+
+
+def scan_zip(origen: "bytes | bytearray | Path", fuente: str = "zip") -> dict:
+    """Extrae los .md de un ZIP a una carpeta temporal.
+
+    Acepta una ruta en disco (camino normal: la subida se escribe por partes y
+    nunca entra completa en memoria) o los bytes ya cargados, que es lo cómodo
+    para los tests.
+
+    Del ZIP se extraen ÚNICAMENTE los .md. Además de ahorrar disco, acota el
+    daño de un archivo hostil: una bomba de descompresión hecha de binarios
+    gigantes no llega a escribirse.
+
+    Protege contra zip-slip: una entrada cuyo destino resuelto caiga fuera de la
+    carpeta temporal aborta todo.
+    """
     import_id, dest = _nueva_carpeta()
     dest_real = dest.resolve()
+    entrada = io.BytesIO(origen) if isinstance(origen, (bytes, bytearray)) else origen
     try:
-        with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
-            for nombre in z.namelist():
-                destino = (dest / nombre).resolve()
+        with zipfile.ZipFile(entrada) as z:
+            miembros = []
+            for info in z.infolist():
+                if not _es_markdown_util(info):
+                    continue
+                destino = (dest / info.filename).resolve()
                 if not str(destino).startswith(str(dest_real)):
                     raise ImportadorError("El ZIP contiene rutas inseguras (zip-slip).")
-            z.extractall(dest)
+                miembros.append(info)
+            if not miembros:
+                raise ImportadorError("El ZIP no contiene ningún archivo .md.")
+            z.extractall(dest, members=miembros)
     except zipfile.BadZipFile:
         git_repo.borrar_arbol(dest)
         raise ImportadorError("Archivo ZIP inválido.")

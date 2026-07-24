@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     # Auditoría vía Claude (REST /audit, apagado si no hay key)
     anthropic_api_key: str | None = None
 
+    # Tamaño máximo del ZIP de lineamientos que se acepta subir, en MB. La
+    # subida se escribe a disco por partes (nunca entera en memoria) y del ZIP
+    # solo se extraen los .md, así que un archivo grande no se traduce en un
+    # consumo grande. Pasado el límite se responde 413 con un mensaje claro.
+    max_upload_mb: int = 500
+
     # Persistencia y datos temporales
     data_dir: str = str(PROJECT_ROOT / "data")
     workspace_dir: str = str(PROJECT_ROOT / "workspace")
