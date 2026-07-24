@@ -1,97 +1,97 @@
-"""Capa de lineamientos: las reglas oficiales de Arquetipos/Microservicio,
-bundleadas como archivos dentro de este repo (wiki_data/), servidas verbatim
-más un índice FTS5 para búsqueda transversal.
+"""Capa de lineamientos: las reglas oficiales del Arquetipo/Microservicio,
+servidas verbatim más búsqueda BM25 transversal.
 
-Por directiva del jefe, solo indexamos Lineamientos/Desarrollo/Arquetipos/Microservicio.
-Las reglas NO se resumen ni se pasan por LLM: son la norma oficial, se sirven tal cual.
+Antes: SQLite FTS5 (tabla `reglas`). Ahora: Postgres/ParadeDB con `pg_search`
+(tabla `lineamientos`). El ranking BM25 se conserva idéntico — cambia el motor,
+no el resultado: `MATCH ... ORDER BY rank` (FTS5) → `@@@ ... ORDER BY
+paradedb.score(id)` (pg_search).
 
-Actualizar contenido: pisar los .md en wiki_data/Microservicio (copiados a mano
-o por CI desde la wiki fuente) y llamar a /wiki/sync para reindexar. No hay git
-en runtime — la wiki viaja congelada dentro de la imagen/deploy.
+Se mantienen la API pública (sync, list_reglas, get_regla, buscar) y los shapes
+de retorno para no tocar main.py ni mcp_server.py.
+
+Fuente de contenido: por ahora los .md bundleados en wiki_data/ — `sync()` los
+relee e inserta/actualiza en `lineamientos`. En la Fase 1 (import) se suma la
+importación desde una URL de GitHub, que reusa la misma tabla.
+
+Las reglas NO se resumen ni pasan por LLM: son la norma, se sirven tal cual.
 """
 
-import sqlite3
 from pathlib import Path
 
+import psycopg
+
+from . import pg
 from .config import settings
 
 MICROSERVICIO_DIR = Path(settings.wiki_microservicio_dir)
-DB_PATH = Path(settings.data_dir) / "wiki_index.db"
+FUENTE_WIKI = "wiki_data/Microservicio"
 
 
 class WikiError(RuntimeError):
     pass
 
 
-def _connect() -> sqlite3.Connection:
-    """Conexión SQLite endurecida: busy_timeout + WAL, igual que en db.py — el
-    reindexado (sync) escribe mientras alguien puede estar buscando/listando."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
-
-
-def sync() -> dict:
-    """Reindexa las reglas bundleadas en disco (sin git: el contenido viaja
-    congelado dentro del deploy; actualizarlo requiere reemplazar los .md y
-    redeployar, o llamar a este endpoint tras pisarlos a mano)."""
-    count = _reindex()
-    return {"reglas_indexadas": count}
-
-
 def _slug_capa(filename: str) -> str:
     """'2.-Application-Handler-con-Wolverine.md' -> 'application-handler-con-wolverine'"""
     name = filename.rsplit(".", 1)[0]
     name = name.lstrip("0123456789.-")
-    return name.strip("-").lower()
+    return name.strip("-").lower() or "otros"
 
 
-def _reindex() -> int:
+def _upsert_capa(c, slug: str) -> None:
+    """Garantiza que la capa exista antes de insertar el lineamiento (FK). Las 6
+    capas oficiales ya vienen sembradas; cualquier otra derivada del nombre del
+    archivo se agrega con orden alto para que quede después de las curadas."""
+    nombre = slug.replace("-", " ").title()
+    c.execute(
+        "INSERT INTO capas (slug, nombre, orden) VALUES (%s, %s, 100) ON CONFLICT (slug) DO NOTHING",
+        (slug, nombre),
+    )
+
+
+def sync() -> dict:
+    """Reindexa las reglas bundleadas en disco hacia Postgres. Idempotente: si el
+    documento (ruta_relativa) ya existe como vigente, actualiza su contenido en
+    lugar de duplicar."""
     if not MICROSERVICIO_DIR.is_dir():
         raise WikiError(f"No existe la carpeta esperada: {MICROSERVICIO_DIR}")
 
-    conn = _connect()
-    conn.execute("DROP TABLE IF EXISTS reglas")
-    conn.execute(
-        """
-        CREATE VIRTUAL TABLE reglas USING fts5(
-            capa, archivo, ruta_relativa, contenido
-        )
-        """
-    )
-
     count = 0
-    for md_file in sorted(MICROSERVICIO_DIR.rglob("*.md")):
-        contenido = md_file.read_text(encoding="utf-8")
-        ruta_relativa = str(md_file.relative_to(MICROSERVICIO_DIR)).replace("\\", "/")
-        capa = _slug_capa(md_file.name)
-        conn.execute(
-            "INSERT INTO reglas (capa, archivo, ruta_relativa, contenido) VALUES (?, ?, ?, ?)",
-            (capa, md_file.name, ruta_relativa, contenido),
-        )
-        count += 1
-
-    conn.commit()
-    conn.close()
-    return count
-
-
-def _ensure_index():
-    if not DB_PATH.exists():
-        _reindex()
+    with pg.conn() as c:
+        for md_file in sorted(MICROSERVICIO_DIR.rglob("*.md")):
+            contenido = md_file.read_text(encoding="utf-8")
+            ruta_relativa = str(md_file.relative_to(MICROSERVICIO_DIR)).replace("\\", "/")
+            capa = _slug_capa(md_file.name)
+            _upsert_capa(c, capa)
+            c.execute(
+                """
+                INSERT INTO lineamientos
+                    (capa_slug, ruta_relativa, titulo, contenido, formato_original, fuente, es_vigente)
+                VALUES (%s, %s, %s, %s, 'md', %s, true)
+                ON CONFLICT (ruta_relativa) WHERE es_vigente
+                DO UPDATE SET capa_slug = EXCLUDED.capa_slug,
+                              titulo    = EXCLUDED.titulo,
+                              contenido = EXCLUDED.contenido,
+                              fuente    = EXCLUDED.fuente
+                """,
+                (capa, ruta_relativa, md_file.name, contenido, FUENTE_WIKI),
+            )
+            count += 1
+    return {"reglas_indexadas": count}
 
 
 def list_reglas() -> list[dict]:
-    _ensure_index()
-    conn = _connect()
-    rows = conn.execute(
-        "SELECT capa, archivo, ruta_relativa, length(contenido) FROM reglas ORDER BY ruta_relativa"
-    ).fetchall()
-    conn.close()
+    with pg.conn() as c:
+        rows = c.execute(
+            """
+            SELECT capa_slug, titulo, ruta_relativa, length(contenido) AS chars
+            FROM lineamientos
+            WHERE es_vigente
+            ORDER BY ruta_relativa
+            """
+        ).fetchall()
     return [
-        {"capa": r[0], "archivo": r[1], "ruta_relativa": r[2], "chars": r[3]}
+        {"capa": r["capa_slug"], "archivo": r["titulo"], "ruta_relativa": r["ruta_relativa"], "chars": r["chars"]}
         for r in rows
     ]
 
@@ -101,59 +101,57 @@ def get_regla(capa: str) -> dict | None:
     prefijo de slug). Cuando el slug es ambiguo (ej. 'endpoints' existe como
     tutorial Y como regla oficial), prioriza las de Lineamientos-de-desarrollo/
     — esas son la norma; el resto son tutoriales paso a paso."""
-    _ensure_index()
-    conn = _connect()
-    for where in ("capa = ?", "capa LIKE ?"):
-        param = capa if where == "capa = ?" else f"%{capa}%"
-        row = conn.execute(
-            f"""
-            SELECT capa, archivo, ruta_relativa, contenido FROM reglas
-            WHERE {where}
-            ORDER BY ruta_relativa LIKE 'Lineamientos-de-desarrollo/%' DESC
-            LIMIT 1
+    with pg.conn() as c:
+        for where, param in (("capa_slug = %s", capa), ("capa_slug LIKE %s", f"%{capa}%")):
+            row = c.execute(
+                f"""
+                SELECT capa_slug, titulo, ruta_relativa, contenido
+                FROM lineamientos
+                WHERE {where} AND es_vigente
+                ORDER BY (ruta_relativa LIKE 'Lineamientos-de-desarrollo/%%') DESC, ruta_relativa
+                LIMIT 1
+                """,
+                (param,),
+            ).fetchone()
+            if row:
+                return {
+                    "capa": row["capa_slug"],
+                    "archivo": row["titulo"],
+                    "ruta_relativa": row["ruta_relativa"],
+                    "contenido": row["contenido"],
+                }
+    return None
+
+
+def _run_busqueda(match_expr: str, limit: int) -> list[dict]:
+    """Una búsqueda BM25 en su propia conexión (para que un error de sintaxis del
+    parser aborte solo esta transacción y el retry use una conexión limpia).
+    paradedb.snippet resalta el fragmento; paradedb.score da el ranking BM25."""
+    with pg.conn() as c:
+        return c.execute(
+            """
+            SELECT capa_slug, titulo, ruta_relativa,
+                   paradedb.snippet(contenido) AS snippet
+            FROM lineamientos
+            WHERE contenido @@@ %s AND es_vigente
+            ORDER BY paradedb.score(id) DESC
+            LIMIT %s
             """,
-            (param,),
-        ).fetchone()
-        if row is not None:
-            break
-    conn.close()
-    if row is None:
-        return None
-    return {"capa": row[0], "archivo": row[1], "ruta_relativa": row[2], "contenido": row[3]}
+            (match_expr, limit),
+        ).fetchall()
 
 
 def buscar(query: str, limit: int = 5) -> list[dict]:
-    """Búsqueda FTS5 sobre las reglas. Devuelve fragmentos con snippet resaltado."""
-    _ensure_index()
-    conn = _connect()
+    """Búsqueda BM25 sobre las reglas. Devuelve fragmentos con snippet resaltado.
+    Mismo comportamiento que la versión FTS5, con fallback si el texto tiene
+    caracteres que el parser de consultas interpreta como sintaxis."""
     try:
-        rows = conn.execute(
-            """
-            SELECT capa, archivo, ruta_relativa,
-                   snippet(reglas, 3, '**', '**', '...', 40)
-            FROM reglas
-            WHERE reglas MATCH ?
-            ORDER BY rank
-            LIMIT ?
-            """,
-            (query, limit),
-        ).fetchall()
-    except sqlite3.OperationalError:
-        # query con sintaxis FTS5 inválida (ej. caracteres especiales sueltos)
-        rows = conn.execute(
-            """
-            SELECT capa, archivo, ruta_relativa,
-                   snippet(reglas, 3, '**', '**', '...', 40)
-            FROM reglas
-            WHERE reglas MATCH ?
-            ORDER BY rank
-            LIMIT ?
-            """,
-            (f'"{query}"', limit),
-        ).fetchall()
-    finally:
-        conn.close()
+        rows = _run_busqueda(query, limit)
+    except psycopg.Error:
+        # query con sintaxis inválida para el parser (ej. caracteres especiales
+        # sueltos) → tratarlo como frase literal entre comillas.
+        rows = _run_busqueda('"' + query.replace('"', "") + '"', limit)
     return [
-        {"capa": r[0], "archivo": r[1], "ruta_relativa": r[2], "snippet": r[3]}
+        {"capa": r["capa_slug"], "archivo": r["titulo"], "ruta_relativa": r["ruta_relativa"], "snippet": r["snippet"]}
         for r in rows
     ]

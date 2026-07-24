@@ -1,96 +1,72 @@
-"""Persistencia simple de repos registrados (SQLite, sin ORM)."""
+"""Persistencia de repos registrados en Postgres.
 
-import sqlite3
-from pathlib import Path
+Antes vivía en SQLite (repos.db); ahora en la tabla `repos` de Postgres/ParadeDB
+(ver migrations/schema.sql). Se mantienen la misma API pública y los mismos shapes
+de retorno para no tocar main.py ni mcp_server.py.
 
-from .config import settings
+La tabla `repos` de Postgres tiene más columnas (credential_id, rama, watch_paths,
+webhook_*, last_indexed_commit...) que se usarán en la Fase 2 (GitHub/CI-CD); acá
+solo se tocan las que necesita el flujo actual de registro + indexado.
+"""
 
-DB_PATH = Path(settings.data_dir) / "repos.db"
+from datetime import datetime
 
+from . import pg
 
-def _conn() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    # busy_timeout (por conexión) hace que una escritura/lectura espere hasta 5s
-    # a que se libere el lock en vez de fallar al instante; WAL (persistente en
-    # el archivo) permite lecturas concurrentes sin bloquear al escritor.
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS repos (
-            name TEXT PRIMARY KEY,
-            source TEXT NOT NULL,
-            local_path TEXT NOT NULL,
-            cbm_project TEXT,
-            status TEXT NOT NULL DEFAULT 'registrado',
-            error TEXT,
-            registered_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-        """
-    )
-    return conn
+# owner es NOT NULL en el esquema; hasta que exista RBAC, todo lo registra el
+# admin del piloto. En la Fase 2 este valor vendrá del usuario autenticado.
+_DEFAULT_OWNER = "admin"
 
 
 def upsert(name: str, source: str, local_path: str, status: str = "registrado"):
-    conn = _conn()
-    conn.execute(
-        """
-        INSERT INTO repos (name, source, local_path, status)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(name) DO UPDATE SET source=excluded.source, local_path=excluded.local_path
-        """,
-        (name, source, local_path, status),
-    )
-    conn.commit()
-    conn.close()
+    with pg.conn() as c:
+        c.execute(
+            """
+            INSERT INTO repos (name, source, local_path, status, owner)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (name) DO UPDATE
+              SET source = EXCLUDED.source,
+                  local_path = EXCLUDED.local_path
+            """,
+            (name, source, local_path, status, _DEFAULT_OWNER),
+        )
 
 
 def set_status(name: str, status: str, cbm_project: str | None = None, error: str | None = None):
-    conn = _conn()
-    conn.execute(
-        "UPDATE repos SET status = ?, cbm_project = COALESCE(?, cbm_project), error = ? WHERE name = ?",
-        (status, cbm_project, error, name),
-    )
-    conn.commit()
-    conn.close()
+    with pg.conn() as c:
+        c.execute(
+            "UPDATE repos SET status = %s, cbm_project = COALESCE(%s, cbm_project), error = %s WHERE name = %s",
+            (status, cbm_project, error, name),
+        )
 
 
 def get(name: str) -> dict | None:
-    conn = _conn()
-    row = conn.execute(
-        "SELECT name, source, local_path, cbm_project, status, error, registered_at FROM repos WHERE name = ?",
-        (name,),
-    ).fetchone()
-    conn.close()
-    if row is None:
-        return None
-    return _row_to_dict(row)
+    with pg.conn() as c:
+        row = c.execute(
+            "SELECT name, source, local_path, cbm_project, status, error, registered_at FROM repos WHERE name = %s",
+            (name,),
+        ).fetchone()
+    return _norm(row) if row else None
 
 
 def list_all() -> list[dict]:
-    conn = _conn()
-    rows = conn.execute(
-        "SELECT name, source, local_path, cbm_project, status, error, registered_at FROM repos ORDER BY registered_at DESC"
-    ).fetchall()
-    conn.close()
-    return [_row_to_dict(r) for r in rows]
+    with pg.conn() as c:
+        rows = c.execute(
+            "SELECT name, source, local_path, cbm_project, status, error, registered_at FROM repos ORDER BY registered_at DESC"
+        ).fetchall()
+    return [_norm(r) for r in rows]
 
 
 def delete(name: str):
-    conn = _conn()
-    conn.execute("DELETE FROM repos WHERE name = ?", (name,))
-    conn.commit()
-    conn.close()
+    with pg.conn() as c:
+        c.execute("DELETE FROM repos WHERE name = %s", (name,))
 
 
-def _row_to_dict(row) -> dict:
-    return {
-        "name": row[0],
-        "source": row[1],
-        "local_path": row[2],
-        "cbm_project": row[3],
-        "status": row[4],
-        "error": row[5],
-        "registered_at": row[6],
-    }
+def _norm(row: dict) -> dict:
+    """registered_at es TIMESTAMPTZ (datetime) — se serializa a ISO para que el
+    dict sea JSON-serializable, igual que devolvía la versión SQLite (string)."""
+    d = dict(row)
+    ra = d.get("registered_at")
+    if isinstance(ra, datetime):
+        d["registered_at"] = ra.isoformat()
+    return d
