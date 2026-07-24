@@ -271,19 +271,19 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = "==0.116.0" },
-    { name = "cryptography", specifier = ">=43,<47" },
+    { name = "cryptography", specifier = "==46.0.7" },
     { name = "fastapi", specifier = "==0.139.0" },
     { name = "fastmcp", specifier = "==3.4.4" },
-    { name = "httpx", specifier = ">=0.27,<1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
-    { name = "psycopg-pool", specifier = ">=3.2,<4" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "psycopg", extras = ["binary"], specifier = "==3.3.4" },
+    { name = "psycopg-pool", specifier = "==3.3.1" },
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "pydantic-settings", specifier = "==2.14.2" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.51.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8,<9" }]
+dev = [{ name = "pytest", specifier = "==8.4.2" }]
 
 [[package]]
 name = "cryptography"
