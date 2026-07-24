@@ -2,7 +2,10 @@ services:
   db:
     # ParadeDB = Postgres 17 con pg_search (BM25) precargado. Es el motor de
     # búsqueda de los lineamientos y la persistencia de repos/jobs/revisiones.
-    image: paradedb/paradedb:latest-pg17
+    # Versión FIJA, no :latest — el esquema usa sintaxis de pg_search >= 0.24
+    # (operador @@@, paradedb.score/snippet) y un salto de versión mayor podría
+    # cambiarla. Esta imagen es la que se validó con migrations/schema.sql.
+    image: paradedb/paradedb:0.24.3-pg17
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-context_hub_dev}
       POSTGRES_DB: context_hub

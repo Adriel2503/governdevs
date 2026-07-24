@@ -25,9 +25,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Binario oficial de codebase-memory-mcp (release Linux, variante UI, build portable)
-RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh \
-    | bash -s -- --ui --dir=/usr/local/bin --skip-config
+# Binario oficial de codebase-memory-mcp (release Linux, variante UI, build portable).
+#
+# PINEADO A UN TAG, no a main. El install.sh de main cambió y pasó a delegar la
+# instalación en el propio binario (`cbm install --dir=...`); con el release 0.9.0
+# eso rompe el build por dos motivos: el auto-instalador ignora --dir (deja el
+# binario en ~/.local/bin y la verificación de /usr/local/bin falla) y además
+# invoca `pgrep`, que no existe en python:slim. El script del tag hace un `cp`
+# directo y no depende de nada de eso.
+#
+# Se fijan LAS DOS cosas al mismo release: el script y los binarios que descarga
+# (por defecto apuntaría a releases/latest/download). El script valida el
+# checksum contra el checksums.txt del mismo tag.
+ARG CBM_VERSION=v0.9.0
+RUN curl -fsSL "https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/${CBM_VERSION}/install.sh" \
+    | CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/${CBM_VERSION}" \
+      bash -s -- --ui --dir=/usr/local/bin --skip-config
 ENV CBM_BIN=/usr/local/bin/codebase-memory-mcp
 # cbm sirve su UI en 127.0.0.1:${CBM_UI_PORT}; el proxy Caddy la expone en
 # 0.0.0.0:${CBM_UI_EXTERNAL_PORT} y le reescribe el Host a localhost (cbm solo
