@@ -8,8 +8,8 @@
 //
 // El alcance salió de medir la wiki real de Real Plaza, no de la especificación
 // de CommonMark: 235 tramos de código inline, 164 delimitadores de bloque, 381
-// items de lista, 134 encabezados, 118 negritas, 57 enlaces, 25 reglas
-// horizontales, 9 imágenes, 8 filas de tabla, 1 blockquote.
+// items de lista, 134 encabezados con #, 76 encabezados subrayados (Setext),
+// 118 negritas, 57 enlaces, 9 imágenes, 8 filas de tabla, 1 blockquote.
 //
 // Regla de oro: lo que no se reconoce cae a párrafo. Estos documentos son la
 // norma de arquitectura — es preferible mostrarlos sin formato que perder una
@@ -246,6 +246,17 @@ function bloques(lineas) {
       const nivel = Math.min(h[1].length + 3, 6);
       frag.append(inline(el(`h${nivel}`, { class: "md-h" }), h[2].trim()));
       i++;
+      continue;
+    }
+
+    // Título estilo Setext: el texto va SUBRAYADO con === o ---. Hay que
+    // mirarlo antes que la regla horizontal, porque comparten el guion: de las
+    // 70 lineas de `---` de esta wiki, 68 son esto. Tratarlas como <hr> partia
+    // 68 titulos de seccion en un parrafo suelto y una raya debajo.
+    const subrayado = (lineas[i + 1] || "").match(/^\s*(=+|-+)\s*$/);
+    if (subrayado && !RE_ITEM.test(linea) && !RE_HR.test(linea)) {
+      frag.append(inline(el(subrayado[1][0] === "=" ? "h4" : "h5", { class: "md-h" }), linea.trim()));
+      i += 2;
       continue;
     }
 

@@ -121,8 +121,11 @@ def get_regla(capa: str) -> dict:
 @mcp.tool
 def buscar_regla(query: str) -> list[dict]:
     """Busca en todas las reglas oficiales por palabra clave (ej. 'totalResults',
-    'nombrar rutas de reportes'). Útil cuando no sabes en qué capa cae la duda."""
-    return wiki.buscar(query)
+    'nombrar rutas de reportes'). Útil cuando no sabes en qué capa cae la duda.
+    Devuelve fragmentos para ubicar la capa; para citar, pedí get_regla."""
+    # `tramos` solo existe para pintar el resaltado en la interfaz. Al agente le
+    # sirve el texto del fragmento, no el markup de dónde coincidió.
+    return [{k: v for k, v in r.items() if k != "tramos"} for r in wiki.buscar(query)]
 
 
 # --- Auditoría: reúne hechos, el agente conectado razona --------------------

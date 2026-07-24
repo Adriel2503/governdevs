@@ -245,9 +245,21 @@ td.actions button + button { margin-left: 6px; }
 
 .search-form { margin-top: 16px; }
 .search-results { margin-top: 12px; display: flex; flex-direction: column; }
-.search-result { padding: 11px 0; border-top: 1px solid var(--line); }
+/* Es un <button> para poder abrir la regla, pero se lee como una fila de
+   resultados: hay que deshacer el estilo de botón que viene de arriba. */
+.search-result {
+  min-height: 0;
+  padding: 11px 8px;
+  border: 0; border-top: 1px solid var(--line); border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit; font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+.search-result:hover { background: var(--surface-2); }
 .search-result:first-child { border-top: 0; }
-.search-result .sr-file { font-size: 12px; font-weight: 700; }
+.search-result .sr-file { display: block; font-size: 12px; font-weight: 700; color: var(--teal-ink); }
 .search-result .sr-snippet { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
 .search-result mark { background: var(--warning-soft); color: var(--ink); padding: 0 2px; border-radius: 3px; }
 

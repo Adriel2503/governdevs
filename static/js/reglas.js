@@ -18,12 +18,16 @@ function displayName(archivo) {
 
 let activeChip = null;
 
+// `chip` es opcional: desde un resultado de búsqueda se abre la misma regla,
+// pero no hay chip que marcar como activo.
 async function openRegla(capa, chip) {
   try {
     const detalle = await getJSON(`/wiki/reglas/${encodeURIComponent(capa)}`);
-    if (activeChip) activeChip.setAttribute("aria-pressed", "false");
-    chip.setAttribute("aria-pressed", "true");
-    activeChip = chip;
+    if (chip) {
+      if (activeChip) activeChip.setAttribute("aria-pressed", "false");
+      chip.setAttribute("aria-pressed", "true");
+      activeChip = chip;
+    }
     openModal({ title: displayName(detalle.archivo), path: detalle.ruta_relativa, content: detalle.contenido });
   } catch (e) {
     toast(`No se pudo abrir la regla: ${e.message}`, { type: "error" });
@@ -57,12 +61,15 @@ export async function refreshReglas() {
   }
 }
 
-function highlightInto(container, snippet) {
-  // El backend marca coincidencias con **...**; las convertimos en <mark>.
-  snippet.split("**").forEach((part, i) => {
-    if (i % 2 === 1) container.append(el("mark", { text: part }));
-    else container.append(document.createTextNode(part));
-  });
+// El backend ya entrega el fragmento partido en tramos, con `hit` indicando
+// cuáles coincidieron. Antes acá se partía por '**' —la marca de SQLite/FTS5—
+// y desde la migración a ParadeDB eso resaltaba la negrita del markdown en vez
+// de la coincidencia.
+function resaltarEn(container, tramos) {
+  for (const tramo of tramos) {
+    if (tramo.hit) container.append(el("mark", { text: tramo.t }));
+    else container.append(document.createTextNode(tramo.t));
+  }
 }
 
 function bindSearch() {
@@ -80,8 +87,16 @@ function bindSearch() {
       }
       for (const r of results) {
         const snippet = el("span", { class: "sr-snippet" });
-        highlightInto(snippet, r.snippet || "");
-        out.append(el("div", { class: "search-result" }, [el("span", { class: "sr-file", text: r.archivo }), snippet]));
+        resaltarEn(snippet, r.tramos || [{ t: r.snippet || "", hit: false }]);
+        // Encontrar la regla y no poder abrirla obligaba a ir a buscar el chip
+        // a mano. El backend ya devuelve la capa en cada resultado.
+        out.append(
+          el("button", {
+            class: "search-result",
+            attrs: { type: "button", "aria-label": `Abrir ${r.archivo}` },
+            on: { click: () => openRegla(r.capa) },
+          }, [el("span", { class: "sr-file", text: r.archivo }), snippet])
+        );
       }
     } catch (err) {
       out.replaceChildren(el("p", { class: "muted", text: `Error: ${err.message}` }));

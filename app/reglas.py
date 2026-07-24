@@ -17,6 +17,7 @@ ese camino estaba muerto en cualquier deploy real y duplicaba el otro.
 Las reglas NO se resumen ni pasan por LLM: son la norma, se sirven tal cual.
 """
 
+import html
 import re
 from pathlib import Path
 from urllib.parse import unquote
@@ -258,6 +259,39 @@ def _run_busqueda(match_expr: str, limit: int) -> list[dict]:
         ).fetchall()
 
 
+_RE_MARCA = re.compile(r"<b>(.*?)</b>", re.DOTALL)
+
+
+def _partir_snippet(bruto: str | None) -> tuple[str, list[dict]]:
+    """Separa el fragmento de ParadeDB en texto plano y tramos marcados.
+
+    `paradedb.snippet()` devuelve las coincidencias envueltas en <b> y ESCAPA el
+    resto como HTML, así que un fragmento crudo se lee
+    `WHERE <b>status</b> = &#x27;active&#x27;`.
+
+    Al migrar de SQLite/FTS5 a ParadeDB nadie actualizó a los consumidores, que
+    seguían partiendo por '**' — la marca del motor viejo. Resultado: el <b>
+    salía como texto literal, las entidades sin decodificar, y se resaltaba la
+    negrita del markdown original en vez de lo que coincidió.
+
+    Se resuelve acá y no en el frontend porque el agente pide lo mismo por MCP:
+    un solo arreglo cubre los dos consumidores.
+
+    Devuelve (texto limpio, tramos), donde cada tramo es {"t": str, "hit": bool}.
+    """
+    texto = bruto or ""
+    tramos: list[dict] = []
+    pos = 0
+    for m in _RE_MARCA.finditer(texto):
+        if m.start() > pos:
+            tramos.append({"t": html.unescape(texto[pos:m.start()]), "hit": False})
+        tramos.append({"t": html.unescape(m.group(1)), "hit": True})
+        pos = m.end()
+    if pos < len(texto):
+        tramos.append({"t": html.unescape(texto[pos:]), "hit": False})
+    return "".join(t["t"] for t in tramos), tramos
+
+
 def buscar(query: str, limit: int = 5) -> list[dict]:
     """Búsqueda BM25 sobre las reglas. Devuelve fragmentos con snippet resaltado.
     Mismo comportamiento que la versión FTS5, con fallback si el texto tiene
@@ -268,7 +302,17 @@ def buscar(query: str, limit: int = 5) -> list[dict]:
         # query con sintaxis inválida para el parser (ej. caracteres especiales
         # sueltos) → tratarlo como frase literal entre comillas.
         rows = _run_busqueda('"' + query.replace('"', "") + '"', limit)
-    return [
-        {"capa": r["capa_slug"], "archivo": r["titulo"], "ruta_relativa": r["ruta_relativa"], "snippet": r["snippet"]}
-        for r in rows
-    ]
+
+    resultados = []
+    for r in rows:
+        texto, tramos = _partir_snippet(r["snippet"])
+        resultados.append(
+            {
+                "capa": r["capa_slug"],
+                "archivo": r["titulo"],
+                "ruta_relativa": r["ruta_relativa"],
+                "snippet": texto,
+                "tramos": tramos,
+            }
+        )
+    return resultados
