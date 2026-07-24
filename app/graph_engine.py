@@ -87,6 +87,24 @@ def get_architecture(project: str) -> dict:
     return _run("get_architecture", {"project": project})
 
 
+def detect_changes(
+    project: str,
+    since: str | None = None,
+    base_branch: str = "main",
+    depth: int = 2,
+) -> dict:
+    """Cambios entre `since` y HEAD, **con su impacto** propagado `depth` saltos
+    por el grafo. Es la base de la verificación de rama (enfoque A).
+
+    Verificado en la práctica: es una consulta de solo lectura — no modifica el
+    grafo canónico (mismos nodos/aristas antes y después), así que se puede
+    correr contra el proyecto de main sin ensuciarlo."""
+    payload = {"project": project, "base_branch": base_branch, "depth": depth}
+    if since:
+        payload["since"] = since
+    return _run("detect_changes", payload)
+
+
 def search_graph(project: str, name_pattern: str, label: str | None = None) -> dict:
     payload = {"project": project, "name_pattern": name_pattern}
     if label:

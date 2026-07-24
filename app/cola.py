@@ -26,7 +26,12 @@ from . import git_repo
 from . import graph_engine as cbm
 from . import pg
 
-_cola: "queue.Queue[str]" = queue.Queue()
+# La cola lleva (tipo, id): "reindex" -> index_jobs, "revision" -> revisiones.
+# Ambos tocan el MISMO clon en disco (uno hace fetch/reset, el otro hace checkout
+# de la rama del PR), así que compartir un único worker no es solo eficiencia:
+# es lo que evita que un reindexado indexe el código de un PR dentro del grafo
+# canónico de main.
+_cola: "queue.Queue[tuple[str, str]]" = queue.Queue()
 _worker: threading.Thread | None = None
 
 
@@ -47,8 +52,14 @@ def encolar(repo_name: str, commit_sha: str | None = None, evento: str = "push")
         return None  # mismo commit ya encolado → nada que hacer
 
     job_id = str(row["id"])
-    _cola.put(job_id)
+    _cola.put(("reindex", job_id))
     return job_id
+
+
+def encolar_revision(revision_id: str) -> str:
+    """Encola la verificación de un PR (ya creada en estado 'generando')."""
+    _cola.put(("revision", revision_id))
+    return revision_id
 
 
 def listar_jobs(repo_name: str, limite: int = 20) -> list[dict]:
@@ -137,9 +148,16 @@ def _procesar(job_id: str) -> None:
 
 def _bucle() -> None:
     while True:
-        job_id = _cola.get()
+        tipo, identificador = _cola.get()
         try:
-            _procesar(job_id)
+            if tipo == "revision":
+                from . import verificacion  # import diferido: evita ciclo al cargar
+
+                verificacion.ejecutar(identificador)
+            else:
+                _procesar(identificador)
+        except Exception:
+            pass  # el worker nunca muere; cada rama ya persiste su propio error
         finally:
             _cola.task_done()
 

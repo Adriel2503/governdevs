@@ -115,6 +115,26 @@ def checkout(dest: Path, ref: str) -> None:
     _run(["checkout", "--force", ref], desc="checkout", cwd=dest)
 
 
+def fetch_pr(dest: Path, url: str, token: str | None, pr_numero: int) -> str:
+    """Trae la cabeza de un PR y devuelve su SHA.
+
+    Se usa `refs/pull/<n>/head`, que GitHub expone para TODO PR — incluidos los
+    que vienen de un fork, donde la rama no existe en el repo original.
+    """
+    ref_local = f"refs/remotes/origin/pr/{pr_numero}"
+    _run(
+        [
+            "-c", "credential.helper=",
+            "fetch", url_con_token(url, token),
+            f"+refs/pull/{pr_numero}/head:{ref_local}",
+        ],
+        desc="fetch pr",
+        cwd=dest,
+        token=token,
+    )
+    return commit_actual(dest, ref_local)
+
+
 def actualizar(dest: Path, url: str, token: str | None, rama: str = "main") -> str:
     """Pone el clon persistente al día con el remoto (fetch + reset duro) y
     devuelve el SHA resultante. Es el primitivo del reindexado incremental que

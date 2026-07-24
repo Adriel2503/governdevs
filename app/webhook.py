@@ -121,9 +121,39 @@ def _procesar_push(repo: dict, payload: dict) -> tuple[int, dict]:
 
 
 def _procesar_pr(repo: dict, payload: dict) -> tuple[int, dict]:
-    """Punto de enganche del paso 7 (verificación de rama: detect_changes +
-    lineamientos → comentario en el PR). Por ahora se acepta sin actuar."""
+    """Verificación final de rama: se registra la revisión y se encola. El
+    trabajo pesado (fetch + detect_changes + lineamientos + comentario) lo hace
+    el worker; acá se responde de inmediato como espera GitHub."""
+    from . import verificacion  # import diferido: evita ciclo al cargar
+
     accion = payload.get("action")
     if accion not in ("opened", "reopened", "synchronize"):
         return 200, {"message": f"Acción de PR '{accion}' ignorada"}
-    return 200, {"message": f"PR '{accion}' recibido (verificación pendiente)", "repo": repo["name"]}
+
+    pr = payload.get("pull_request") or {}
+    numero = payload.get("number") or pr.get("number")
+    if not numero:
+        return 400, {"message": "Falta el número del PR"}
+
+    rama_origen = (pr.get("head") or {}).get("ref") or ""
+    rama_destino = (pr.get("base") or {}).get("ref") or ""
+    vigilada = repo.get("rama") or "main"
+    if rama_destino and rama_destino != vigilada:
+        return 200, {"message": f"PR hacia '{rama_destino}', no hacia '{vigilada}': ignorado"}
+
+    revision_id = verificacion.crear(
+        repo_name=repo["name"],
+        pr_numero=int(numero),
+        rama=rama_origen or f"pr/{numero}",
+        autor=(pr.get("user") or {}).get("login"),
+        base_commit=(pr.get("base") or {}).get("sha"),
+        head_commit=(pr.get("head") or {}).get("sha"),
+    )
+    cola.encolar_revision(revision_id)
+
+    return 200, {
+        "message": "Verificación de rama encolada",
+        "repo": repo["name"],
+        "pr": numero,
+        "revision_id": revision_id,
+    }

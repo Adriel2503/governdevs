@@ -30,6 +30,7 @@ from . import git_repo, github_api
 from . import graph_engine as cbm
 from . import importador
 from . import reglas as wiki
+from . import verificacion
 from . import webhook as gh_webhook
 from .config import settings
 from .mcp_server import mcp as mcp_server
@@ -202,6 +203,14 @@ def repo_jobs(name: str):
     if repos_db.get(name) is None:
         raise HTTPException(404, "Repo no registrado")
     return cola.listar_jobs(name)
+
+
+@app.get("/repos/{name}/revisiones")
+def repo_revisiones(name: str):
+    """Historial de verificaciones de rama (una por PR abierto/actualizado)."""
+    if repos_db.get(name) is None:
+        raise HTTPException(404, "Repo no registrado")
+    return verificacion.listar(name)
 
 
 @app.get("/repos")
