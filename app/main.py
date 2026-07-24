@@ -3,7 +3,7 @@
 Un solo proceso FastAPI que:
   - registra repos (URL git o ruta local), los indexa con el binario cbm
     (codebase-memory-mcp) y expone su grafo/arquitectura
-  - sirve los lineamientos oficiales de la Wiki-Arquitectura (verbatim + FTS5)
+  - sirve los lineamientos oficiales de la Wiki-Arquitectura (verbatim + BM25)
   - /audit junta grafo + lineamientos para auditar un módulo con Claude
 
 cbm y la wiki quedan totalmente detrás de esta capa: el frontend nunca los
