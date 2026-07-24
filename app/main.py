@@ -13,8 +13,6 @@ reescribe.
 
 import json
 import re
-import shutil
-import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -27,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from . import credenciales
 from . import db as repos_db
+from . import git_repo
 from . import graph_engine as cbm
 from . import importador
 from . import reglas as wiki
@@ -38,6 +37,12 @@ _CAPAS_AUDITORIA = ["endpoints", "ruteo", "handlers", "queries", "validators", "
 
 WORKSPACE = Path(settings.workspace_dir)
 WORKSPACE.mkdir(exist_ok=True)
+
+# Clones PERSISTENTES de los repos vigilados. A diferencia de la versión previa
+# (que borraba el working tree tras indexar), estos sobreviven: son la base del
+# fetch incremental que dispara el webhook y de que detect_changes pueda diffear
+# ramas. Efecto secundario bueno: get_code_snippet sigue devolviendo el código.
+REPOS_DIR = WORKSPACE / "repos"
 
 # La UI 3D la sirve el propio binario cbm en su propio puerto dentro del
 # contenedor. Redirigir al navegador del cliente a "localhost:<puerto>" solo
@@ -86,6 +91,14 @@ class RegisterRepoRequest(BaseModel):
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$",
         description="Slug seguro para usar en rutas: letras, números, guion y guion bajo.",
     )
+    credential_id: str | None = Field(
+        default=None, description="Credencial para clonar repos privados (ver /credenciales)."
+    )
+    rama: str = Field(default="main", description="Rama canónica vigilada.")
+    watch_paths: list[str] = Field(
+        default_factory=list,
+        description="Globs; si se define, solo se reindexa cuando cambian estos archivos.",
+    )
 
 
 def _is_git_url(source: str) -> bool:
@@ -98,15 +111,13 @@ def _derive_name(source: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "-", stem).lower() or "repo"
 
 
-def _index_repo_job(name: str, local_path: str, delete_clone_after: bool = False):
+def _index_repo_job(name: str, local_path: str):
     """Corre en background: index_repository puede tardar en repos grandes.
 
-    Solo nos interesa el grafo, no el código clonado: si delete_clone_after es
-    True (repo registrado por URL), el working tree se borra apenas cbm termina
-    de indexar. cbm relee el código fuente del disco en cada get_code_snippet
-    (no lo persiste en su propio store) — por diseño, para estos repos esa tool
-    deja de devolver "source" una vez borrado el clon; el grafo (arquitectura,
-    search_graph, trace_path) sigue funcionando porque eso sí vive en el store."""
+    El clon YA NO se borra al terminar (antes sí, para repos por URL). Los repos
+    vigilados persisten en disco porque el reindexado incremental hace `fetch`
+    sobre ese mismo clon y porque detect_changes necesita la historia para
+    diffear ramas. De paso, get_code_snippet sigue devolviendo el código fuente."""
     try:
         repos_db.set_status(name, "indexando")
         cbm.index_repository(local_path)
@@ -119,12 +130,16 @@ def _index_repo_job(name: str, local_path: str, delete_clone_after: bool = False
                 cbm_project = p["name"]
                 break
 
-        repos_db.set_status(name, "listo", cbm_project=cbm_project)
+        # Ancla el grafo a un commit concreto: es la base contra la que el
+        # webhook decidirá qué reindexar.
+        try:
+            commit = git_repo.commit_actual(Path(local_path))
+        except git_repo.GitError:
+            commit = None  # ruta local que no es un repo git
+
+        repos_db.marcar_indexado(name, commit_sha=commit, cbm_project=cbm_project)
     except cbm.CbmError as e:
         repos_db.set_status(name, "error", error=str(e))
-    finally:
-        if delete_clone_after:
-            shutil.rmtree(local_path, ignore_errors=True)
 
 
 @app.post("/repos")
@@ -132,27 +147,38 @@ def register_repo(req: RegisterRepoRequest, background_tasks: BackgroundTasks):
     name = req.name or _derive_name(req.source)
 
     if _is_git_url(req.source):
-        local_path = WORKSPACE / name
-        if not local_path.exists():
-            result = subprocess.run(
-                ["git", "clone", req.source, str(local_path)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                stdin=subprocess.DEVNULL,
-                timeout=300,
-            )
-            if result.returncode != 0:
-                raise HTTPException(400, f"git clone falló: {result.stderr.strip()}")
+        token = None
+        if req.credential_id:
+            try:
+                token = credenciales.token_para_clonar(req.credential_id)
+            except credenciales.CredencialError as e:
+                raise HTTPException(400, str(e))
+
+        local_path = REPOS_DIR / name
+        try:
+            if local_path.exists():
+                git_repo.actualizar(local_path, req.source, token, req.rama)
+            else:
+                git_repo.clonar(req.source, token, local_path, req.rama)
+        except git_repo.GitError as e:
+            raise HTTPException(400, str(e))
     else:
         local_path = Path(req.source)
         if not local_path.is_dir():
             raise HTTPException(400, f"La ruta local no existe: {req.source}")
 
-    repos_db.upsert(name, req.source, str(local_path), status="registrado")
-    background_tasks.add_task(_index_repo_job, name, str(local_path), _is_git_url(req.source))
+    repos_db.upsert(
+        name,
+        req.source,
+        str(local_path),
+        status="registrado",
+        credential_id=req.credential_id,
+        rama=req.rama,
+        watch_paths=req.watch_paths,
+    )
+    background_tasks.add_task(_index_repo_job, name, str(local_path))
 
-    return {"name": name, "local_path": str(local_path), "status": "registrado"}
+    return {"name": name, "local_path": str(local_path), "rama": req.rama, "status": "registrado"}
 
 
 @app.get("/repos")
@@ -197,8 +223,9 @@ def repo_graph_ui(name: str):
 
 @app.delete("/repos/{name}")
 def delete_repo(name: str):
-    """El working tree clonado ya se borró al terminar de indexar (solo nos
-    interesa el grafo) — esto solo limpia el proyecto de cbm y el registro."""
+    """Limpia el proyecto de cbm, el clon persistente y el registro. Solo se borra
+    el working tree si lo gestionamos nosotros (está bajo REPOS_DIR): jamás se
+    toca una ruta local que el usuario registró apuntando a su propio disco."""
     repo = repos_db.get(name)
     if repo is None:
         raise HTTPException(404, "Repo no registrado")
@@ -208,6 +235,11 @@ def delete_repo(name: str):
             cbm.delete_project(repo["cbm_project"])
         except cbm.CbmError:
             pass
+
+    local_path = repo.get("local_path")
+    if local_path and Path(local_path).resolve().is_relative_to(REPOS_DIR.resolve()):
+        git_repo.borrar_arbol(local_path)
+
     repos_db.delete(name)
     return {"deleted": name}
 

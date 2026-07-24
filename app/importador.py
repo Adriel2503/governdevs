@@ -15,13 +15,12 @@ efímera. Mismo patrón que los repos de código (clonar → usar → borrar).
 """
 
 import io
-import shutil
 import subprocess
 import uuid
 import zipfile
 from pathlib import Path
 
-from . import reglas
+from . import git_repo, reglas
 from .config import settings
 
 IMPORTS_DIR = Path(settings.workspace_dir) / "imports"
@@ -77,10 +76,10 @@ def scan_git(url: str, token: str | None = None) -> dict:
             timeout=300,
         )
     except subprocess.TimeoutExpired:
-        shutil.rmtree(dest, ignore_errors=True)
+        git_repo.borrar_arbol(dest)
         raise ImportadorError("El clone superó el tiempo límite (300s).")
     if r.returncode != 0:
-        shutil.rmtree(dest, ignore_errors=True)
+        git_repo.borrar_arbol(dest)
         err = (r.stderr or "").strip()
         if token:
             err = err.replace(token, "***")  # no filtrar el token
@@ -101,10 +100,10 @@ def scan_zip(file_bytes: bytes, fuente: str = "zip") -> dict:
                     raise ImportadorError("El ZIP contiene rutas inseguras (zip-slip).")
             z.extractall(dest)
     except zipfile.BadZipFile:
-        shutil.rmtree(dest, ignore_errors=True)
+        git_repo.borrar_arbol(dest)
         raise ImportadorError("Archivo ZIP inválido.")
     except ImportadorError:
-        shutil.rmtree(dest, ignore_errors=True)
+        git_repo.borrar_arbol(dest)
         raise
     return _resultado_scan(import_id, dest, fuente=fuente)
 
@@ -130,5 +129,5 @@ def indexar(import_id: str, carpeta: str = "") -> dict:
         count = reglas.indexar_carpeta(base, fuente)
     finally:
         # solo persiste en la BD lo de la carpeta elegida; la descarga se borra
-        shutil.rmtree(dest, ignore_errors=True)
+        git_repo.borrar_arbol(dest)
     return {"indexadas": count, "carpeta": carpeta or "(raíz)", "fuente": fuente}

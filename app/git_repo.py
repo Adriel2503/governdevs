@@ -15,6 +15,9 @@ Sin shell: `subprocess.run` con lista de argumentos → inmune a command injecti
 (por eso no hace falta el `shell-quote` que sí necesita Dokploy).
 """
 
+import os
+import shutil
+import stat
 import subprocess
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
@@ -22,6 +25,28 @@ from urllib.parse import urlparse, urlunparse
 
 class GitError(RuntimeError):
     pass
+
+
+def borrar_arbol(path: Path | str) -> None:
+    """rmtree robusto para clones git.
+
+    En Windows los objetos bajo `.git/objects` quedan de solo-lectura y
+    `shutil.rmtree` falla; con `ignore_errors=True` el fallo pasa **en silencio**
+    y el clon queda huérfano en disco. Acá se limpia el flag de solo-lectura y se
+    reintenta, así el borrado es real en todas las plataformas.
+    """
+    p = Path(path)
+    if not p.exists():
+        return
+
+    def _forzar(func, ruta, _exc):
+        try:
+            os.chmod(ruta, stat.S_IWRITE)
+            func(ruta)
+        except OSError:
+            pass
+
+    shutil.rmtree(p, onexc=_forzar)
 
 
 def _run(
@@ -88,6 +113,15 @@ def fetch(dest: Path, url: str, token: str | None, rama: str | None = None) -> N
 
 def checkout(dest: Path, ref: str) -> None:
     _run(["checkout", "--force", ref], desc="checkout", cwd=dest)
+
+
+def actualizar(dest: Path, url: str, token: str | None, rama: str = "main") -> str:
+    """Pone el clon persistente al día con el remoto (fetch + reset duro) y
+    devuelve el SHA resultante. Es el primitivo del reindexado incremental que
+    dispara el webhook: barato comparado con re-clonar."""
+    fetch(dest, url, token, rama)
+    _run(["reset", "--hard", f"origin/{rama}"], desc="reset --hard", cwd=dest)
+    return commit_actual(dest)
 
 
 def commit_actual(dest: Path, ref: str = "HEAD") -> str:

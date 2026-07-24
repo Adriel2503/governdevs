@@ -1,7 +1,29 @@
 services:
+  db:
+    # ParadeDB = Postgres 17 con pg_search (BM25) precargado. Es el motor de
+    # búsqueda de los lineamientos y la persistencia de repos/jobs/revisiones.
+    image: paradedb/paradedb:latest-pg17
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-context_hub_dev}
+      POSTGRES_DB: context_hub
+    volumes:
+      - context_hub_db:/var/lib/postgresql/data
+      # initdb corre los .sql de este directorio SOLO la primera vez (volumen
+      # vacío). Así la base nace con el esquema completo, sin paso manual.
+      - ./migrations/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d context_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
   context-hub:
     build:
       context: .
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"   # app: web + REST + MCP
       - "9749:9749"   # grafo 3D (UI que sirve el binario cbm)
@@ -11,12 +33,24 @@ services:
       - path: .env
         required: false
     environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-context_hub_dev}@db:5432/context_hub
+      # Clave Fernet para cifrar los secretos (PAT, webhook secrets) en la base.
+      # Generar: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      # Si queda vacía, la app arranca igual y falla con un mensaje claro al usar credenciales.
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY:-}
       # URL pública desde la que se accede al grafo 3D. En local con los puertos
       # publicados, localhost funciona; en Dokploy poné el dominio real del 9749.
       GRAPH_UI_PUBLIC_URL: ${GRAPH_UI_PUBLIC_URL:-http://localhost:9749}
+      # URL pública de la app: con esto se arma la URL del webhook que se
+      # registra en GitHub. En local no sirve para webhooks (GitHub no llega).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      # Los clones de los repos vigilados PERSISTEN (fetch incremental +
+      # detect_changes necesitan la historia), así que viven en el volumen de
+      # datos y no en el filesystem efímero del contenedor.
+      WORKSPACE_DIR: /app/data/workspace
     volumes:
-      # Todo el estado (repos.db, wiki_index.db y el store del grafo de cbm bajo
-      # $HOME=/app/data) en un volumen nombrado que sobrevive redeploys.
+      # Estado que debe sobrevivir redeploys: el store del grafo de cbm (bajo
+      # $HOME=/app/data) y los clones persistentes de los repos vigilados.
       - context_hub_data:/app/data
       # Lineamientos confidenciales de Real Plaza: se montan en runtime, de
       # solo-lectura, y NO viajan dentro de la imagen. Apuntá el origen a donde
@@ -31,3 +65,4 @@ services:
 
 volumes:
   context_hub_data:
+  context_hub_db:

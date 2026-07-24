@@ -18,17 +18,34 @@ from . import pg
 _DEFAULT_OWNER = "admin"
 
 
-def upsert(name: str, source: str, local_path: str, status: str = "registrado"):
+_COLS = (
+    "name, source, local_path, cbm_project, status, error, registered_at, "
+    "credential_id, rama, watch_paths, last_indexed_commit, last_synced_at"
+)
+
+
+def upsert(
+    name: str,
+    source: str,
+    local_path: str,
+    status: str = "registrado",
+    credential_id: str | None = None,
+    rama: str = "main",
+    watch_paths: list[str] | None = None,
+):
     with pg.conn() as c:
         c.execute(
             """
-            INSERT INTO repos (name, source, local_path, status, owner)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO repos (name, source, local_path, status, owner, credential_id, rama, watch_paths)
+            VALUES (%s, %s, %s, %s, %s, %s::uuid, %s, %s)
             ON CONFLICT (name) DO UPDATE
-              SET source = EXCLUDED.source,
-                  local_path = EXCLUDED.local_path
+              SET source        = EXCLUDED.source,
+                  local_path    = EXCLUDED.local_path,
+                  credential_id = EXCLUDED.credential_id,
+                  rama          = EXCLUDED.rama,
+                  watch_paths   = EXCLUDED.watch_paths
             """,
-            (name, source, local_path, status, _DEFAULT_OWNER),
+            (name, source, local_path, status, _DEFAULT_OWNER, credential_id, rama, watch_paths or []),
         )
 
 
@@ -40,20 +57,33 @@ def set_status(name: str, status: str, cbm_project: str | None = None, error: st
         )
 
 
+def marcar_indexado(name: str, commit_sha: str | None = None, cbm_project: str | None = None):
+    """Cierra un ciclo de indexado: deja el repo listo y registra hasta qué commit
+    está el grafo (base del reindexado incremental de la Fase 2)."""
+    with pg.conn() as c:
+        c.execute(
+            """
+            UPDATE repos
+               SET status              = 'listo',
+                   error               = NULL,
+                   cbm_project         = COALESCE(%s, cbm_project),
+                   last_indexed_commit = COALESCE(%s, last_indexed_commit),
+                   last_synced_at      = now()
+             WHERE name = %s
+            """,
+            (cbm_project, commit_sha, name),
+        )
+
+
 def get(name: str) -> dict | None:
     with pg.conn() as c:
-        row = c.execute(
-            "SELECT name, source, local_path, cbm_project, status, error, registered_at FROM repos WHERE name = %s",
-            (name,),
-        ).fetchone()
+        row = c.execute(f"SELECT {_COLS} FROM repos WHERE name = %s", (name,)).fetchone()
     return _norm(row) if row else None
 
 
 def list_all() -> list[dict]:
     with pg.conn() as c:
-        rows = c.execute(
-            "SELECT name, source, local_path, cbm_project, status, error, registered_at FROM repos ORDER BY registered_at DESC"
-        ).fetchall()
+        rows = c.execute(f"SELECT {_COLS} FROM repos ORDER BY registered_at DESC").fetchall()
     return [_norm(r) for r in rows]
 
 
@@ -63,10 +93,12 @@ def delete(name: str):
 
 
 def _norm(row: dict) -> dict:
-    """registered_at es TIMESTAMPTZ (datetime) — se serializa a ISO para que el
-    dict sea JSON-serializable, igual que devolvía la versión SQLite (string)."""
+    """Los TIMESTAMPTZ y el UUID se serializan a string para que el dict sea
+    JSON-serializable (la versión SQLite ya devolvía strings)."""
     d = dict(row)
-    ra = d.get("registered_at")
-    if isinstance(ra, datetime):
-        d["registered_at"] = ra.isoformat()
+    for campo in ("registered_at", "last_synced_at"):
+        if isinstance(d.get(campo), datetime):
+            d[campo] = d[campo].isoformat()
+    if d.get("credential_id") is not None:
+        d["credential_id"] = str(d["credential_id"])
     return d
