@@ -19,8 +19,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 import anthropic
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,7 @@ from . import git_repo, github_api
 from . import graph_engine as cbm
 from . import importador
 from . import reglas as wiki
+from . import webhook as gh_webhook
 from .config import settings
 from .mcp_server import mcp as mcp_server
 
@@ -274,6 +275,21 @@ def delete_repo(name: str):
 
     repos_db.delete(name)
     return {"deleted": name}
+
+
+# --- Webhook de GitHub -----------------------------------------------------
+
+
+@app.post("/webhooks/github", include_in_schema=False)
+async def webhook_github(request: Request):
+    """Recibe push/pull_request de GitHub. Se lee el cuerpo CRUDO porque la firma
+    HMAC se calcula sobre esos bytes exactos: re-serializar el JSON puede no
+    coincidir byte a byte y tirar abajo firmas válidas."""
+    cuerpo = await request.body()
+    firma = request.headers.get("x-hub-signature-256", "")
+    evento = request.headers.get("x-github-event", "")
+    status, body = gh_webhook.procesar(cuerpo, firma, evento)
+    return JSONResponse(status_code=status, content=body)
 
 
 # --- Credenciales git (PAT hoy, GitHub App en v3) --------------------------

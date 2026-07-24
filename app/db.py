@@ -75,6 +75,19 @@ def marcar_indexado(name: str, commit_sha: str | None = None, cbm_project: str |
         )
 
 
+def buscar_por_github(full_name: str) -> list[dict]:
+    """Candidatos cuyo `source` apunta a 'owner/repo' (el full_name que manda
+    GitHub en el webhook). Devuelve una lista porque el match por URL puede ser
+    ambiguo; quien desempata es la firma HMAC (solo el repo correcto tiene el
+    secreto), así la búsqueda y la autenticación son el mismo paso."""
+    with pg.conn() as c:
+        rows = c.execute(
+            f"SELECT {_COLS} FROM repos WHERE source ILIKE %s OR source ILIKE %s",
+            (f"%{full_name}", f"%{full_name}.git"),
+        ).fetchall()
+    return [_norm(r) for r in rows]
+
+
 def guardar_webhook(name: str, hook_id: int | None, secret_cifrado: str | None):
     with pg.conn() as c:
         c.execute(
