@@ -6,6 +6,7 @@
 import { api, postJSON, el } from "./api.js";
 import { toast } from "./toast.js";
 import { refreshReglas } from "./reglas.js";
+import { refrescarFuentes } from "./fuentes.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -75,6 +76,7 @@ async function runIndex(btn) {
     $("importResult").replaceChildren();
     importId = null;
     refreshReglas();
+    refrescarFuentes(); // la importación recién hecha tiene que aparecer en la lista
   } catch (err) {
     toast(`No se pudo indexar: ${err.message}`, { type: "error" });
     btn.disabled = false;

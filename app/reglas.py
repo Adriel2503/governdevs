@@ -138,6 +138,58 @@ def sync() -> dict:
     return {"reglas_indexadas": indexar_carpeta(MICROSERVICIO_DIR, FUENTE_WIKI)}
 
 
+def listar_fuentes() -> list[dict]:
+    """De dónde vino cada lote de lineamientos, para poder quitarlo después.
+
+    `fuente` es 'archivo.zip#carpeta/elegida' o la URL del repo: identifica una
+    importación concreta, que es la unidad con la que uno razona ("subí este ZIP
+    y me equivoqué de carpeta").
+    """
+    with pg.conn() as c:
+        rows = c.execute(
+            """
+            SELECT fuente, count(*) AS documentos, max(creado_en) AS ultima
+            FROM lineamientos
+            WHERE es_vigente
+            GROUP BY fuente
+            ORDER BY max(creado_en) DESC
+            """
+        ).fetchall()
+    return [
+        {
+            "fuente": r["fuente"] or "(sin fuente)",
+            "documentos": r["documentos"],
+            "ultima": r["ultima"].isoformat() if r["ultima"] else None,
+        }
+        for r in rows
+    ]
+
+
+def borrar_fuente(fuente: str) -> dict:
+    """Elimina los lineamientos de una importación.
+
+    Borrado real, no `es_vigente = false`: esto es un "deshacer lo que subí", y
+    dejar filas ocultas acumulándose es justo lo que uno quiere evitar al pedirlo.
+
+    Además limpia las capas que quedaron huérfanas, pero SOLO las creadas
+    automáticamente al importar (orden = 100). Las 6 capas oficiales que siembra
+    el esquema tienen orden 1..6 y no se tocan nunca, aunque se queden sin
+    documentos: son parte del modelo, no de la importación.
+    """
+    with pg.conn() as c:
+        eliminados = c.execute(
+            "DELETE FROM lineamientos WHERE fuente = %s", (fuente,)
+        ).rowcount
+        capas = c.execute(
+            """
+            DELETE FROM capas
+            WHERE orden = 100
+              AND slug NOT IN (SELECT DISTINCT capa_slug FROM lineamientos)
+            """
+        ).rowcount
+    return {"eliminados": eliminados, "capas_limpiadas": capas}
+
+
 def list_reglas() -> list[dict]:
     with pg.conn() as c:
         rows = c.execute(

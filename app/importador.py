@@ -126,7 +126,18 @@ def scan_zip(origen: "bytes | bytearray | Path", fuente: str = "zip") -> dict:
                 miembros.append(info)
             if not miembros:
                 raise ImportadorError("El ZIP no contiene ningún archivo .md.")
-            z.extractall(dest, members=miembros)
+            try:
+                z.extractall(dest, members=miembros)
+            except OSError as e:
+                # En Windows la ruta completa no puede pasar de 260 caracteres.
+                # No pasa en producción (Linux, y la ruta base del contenedor es
+                # corta), pero en desarrollo con una carpeta de trabajo profunda
+                # sí — y sin esto el usuario recibe un 500 pelado.
+                raise ImportadorError(
+                    f"No se pudo extraer el ZIP: {e}. "
+                    "Si estás en Windows puede ser el límite de 260 caracteres en la ruta: "
+                    "usá un WORKSPACE_DIR más corto."
+                ) from e
     except zipfile.BadZipFile:
         git_repo.borrar_arbol(dest)
         raise ImportadorError("Archivo ZIP inválido.")

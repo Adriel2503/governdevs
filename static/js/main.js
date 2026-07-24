@@ -13,6 +13,7 @@ import { initActividad } from "./actividad.js";
 import { initReglas, aplicarCapacidades as reglasCapacidades } from "./reglas.js";
 import { initAudit, aplicarCapacidades as auditCapacidades } from "./audit.js";
 import { initImportar } from "./importar.js";
+import { initFuentes } from "./fuentes.js";
 
 initCredenciales();
 initRepos();
@@ -20,6 +21,7 @@ initActividad();
 initReglas();
 initAudit();
 initImportar();
+initFuentes();
 
 // Si /capacidades falla, se asume todo disponible: preferimos un botón que
 // pueda fallar antes que esconder funciones por un problema de red.

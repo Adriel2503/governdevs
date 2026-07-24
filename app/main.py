@@ -350,6 +350,26 @@ def wiki_sync():
         raise HTTPException(500, str(e))
 
 
+@app.get("/wiki/fuentes")
+def wiki_fuentes():
+    """Los lotes de lineamientos importados, para poder quitarlos."""
+    return wiki.listar_fuentes()
+
+
+@app.delete("/wiki/fuentes")
+def wiki_borrar_fuente(fuente: str):
+    """Elimina los lineamientos de una importación.
+
+    La fuente va como query param y no en la ruta porque contiene '/' y '#'
+    (ej. 'wiki.zip#Lineamientos/Desarrollo/Microservicio'), que romperían el
+    enrutado por path.
+    """
+    resultado = wiki.borrar_fuente(fuente)
+    if not resultado["eliminados"]:
+        raise HTTPException(404, f"No hay lineamientos de la fuente: {fuente}")
+    return resultado
+
+
 @app.get("/wiki/reglas")
 def wiki_list_reglas():
     return wiki.list_reglas()
