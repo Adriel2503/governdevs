@@ -4,7 +4,9 @@
 import { initRepos } from "./repos.js";
 import { initReglas } from "./reglas.js";
 import { initAudit } from "./audit.js";
+import { initImportar } from "./importar.js";
 
 initRepos();
 initReglas();
 initAudit();
+initImportar();

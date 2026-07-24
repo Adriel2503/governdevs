@@ -64,6 +64,31 @@
       </div>
     </section>
 
+    <section class="workspace-panel" aria-labelledby="importTitle">
+      <div class="panel-header">
+        <div>
+          <h2 id="importTitle">Lineamientos oficiales</h2>
+          <p>Importa la documentación de arquitectura desde un repositorio o un archivo ZIP, y elige qué carpeta indexar.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="import-modes" role="group" aria-label="Fuente de los lineamientos">
+          <button class="secondary btn-sm" id="importModeGit" type="button" aria-pressed="true">Desde repositorio</button>
+          <button class="secondary btn-sm" id="importModeZip" type="button" aria-pressed="false">Subir ZIP</button>
+        </div>
+        <form id="importGitForm" class="import-form">
+          <input type="text" id="importUrl" placeholder="URL del repositorio (https://github.com/…)" aria-label="URL del repositorio" />
+          <input type="password" id="importToken" placeholder="Token de acceso (opcional, repos privados)" aria-label="Token de acceso" />
+          <button type="submit" class="secondary">Escanear</button>
+        </form>
+        <form id="importZipForm" class="import-form" hidden>
+          <input type="file" id="importZipFile" accept=".zip" aria-label="Archivo ZIP de la wiki" />
+          <button type="submit" class="secondary">Escanear ZIP</button>
+        </form>
+        <div class="import-result" id="importResult" aria-live="polite"></div>
+      </div>
+    </section>
+
     <p class="section-label">Contexto para desarrollo</p>
     <section class="developer-grid" aria-label="Herramientas para desarrolladores">
       <div class="subpanel">

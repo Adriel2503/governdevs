@@ -20,13 +20,14 @@ from pathlib import Path
 from urllib.parse import quote
 
 import anthropic
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db as repos_db
 from . import graph_engine as cbm
+from . import importador
 from . import reglas as wiki
 from .config import settings
 from .mcp_server import mcp as mcp_server
@@ -237,6 +238,52 @@ def wiki_get_regla(capa: str):
 @app.get("/wiki/buscar")
 def wiki_buscar(q: str):
     return wiki.buscar(q)
+
+
+# --- Import de lineamientos (repo GitHub / ZIP subido) ---------------------
+# Flujo en dos pasos: (1) escanear una fuente → devuelve el árbol de carpetas;
+# (2) indexar la carpeta raíz elegida → persiste solo eso y borra la descarga.
+
+
+class ImportGitRequest(BaseModel):
+    url: str  # URL del repo (GitHub; Azure DevOps en Fase 2)
+    token: str | None = None  # PAT para repos privados; nunca se guarda ni loguea
+
+
+class ImportIndexRequest(BaseModel):
+    import_id: str
+    carpeta: str = ""  # carpeta raíz a indexar (ej. "Microservicio"); "" = todo
+
+
+@app.post("/wiki/import/git")
+def wiki_import_git(req: ImportGitRequest):
+    """Paso 1 (git): clona el repo a una carpeta temporal y devuelve el árbol de
+    carpetas con conteo de .md para que el admin elija cuál indexar."""
+    try:
+        return importador.scan_git(req.url, req.token)
+    except importador.ImportadorError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/wiki/import/zip")
+async def wiki_import_zip(file: UploadFile = File(...)):
+    """Paso 1 (ZIP): descomprime el archivo subido a una carpeta temporal y
+    devuelve el árbol de carpetas para elegir la raíz a indexar."""
+    data = await file.read()
+    try:
+        return importador.scan_zip(data, fuente=file.filename or "zip")
+    except importador.ImportadorError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/wiki/import/index")
+def wiki_import_index(req: ImportIndexRequest):
+    """Paso 2: indexa los .md de la carpeta elegida en `lineamientos` y borra la
+    descarga temporal. Solo persiste en la BD lo de esa carpeta."""
+    try:
+        return importador.indexar(req.import_id, req.carpeta)
+    except (importador.ImportadorError, wiki.WikiError) as e:
+        raise HTTPException(400, str(e))
 
 
 # --- Auditoría en vivo (grafo + lineamientos + LLM) ------------------------

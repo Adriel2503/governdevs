@@ -49,18 +49,19 @@ def _upsert_capa(c, slug: str) -> None:
     )
 
 
-def sync() -> dict:
-    """Reindexa las reglas bundleadas en disco hacia Postgres. Idempotente: si el
-    documento (ruta_relativa) ya existe como vigente, actualiza su contenido en
-    lugar de duplicar."""
-    if not MICROSERVICIO_DIR.is_dir():
-        raise WikiError(f"No existe la carpeta esperada: {MICROSERVICIO_DIR}")
+def indexar_carpeta(base_dir: Path, fuente: str) -> int:
+    """Indexa todos los .md bajo base_dir en `lineamientos` (upsert por
+    ruta_relativa vigente; idempotente). Reutilizado por sync() (wiki_data
+    bundleada) y por el importador (repos de GitHub / ZIP subidos). `fuente`
+    registra de dónde vino cada documento para trazabilidad."""
+    if not base_dir.is_dir():
+        raise WikiError(f"No existe la carpeta: {base_dir}")
 
     count = 0
     with pg.conn() as c:
-        for md_file in sorted(MICROSERVICIO_DIR.rglob("*.md")):
+        for md_file in sorted(base_dir.rglob("*.md")):
             contenido = md_file.read_text(encoding="utf-8")
-            ruta_relativa = str(md_file.relative_to(MICROSERVICIO_DIR)).replace("\\", "/")
+            ruta_relativa = str(md_file.relative_to(base_dir)).replace("\\", "/")
             capa = _slug_capa(md_file.name)
             _upsert_capa(c, capa)
             c.execute(
@@ -74,10 +75,17 @@ def sync() -> dict:
                               contenido = EXCLUDED.contenido,
                               fuente    = EXCLUDED.fuente
                 """,
-                (capa, ruta_relativa, md_file.name, contenido, FUENTE_WIKI),
+                (capa, ruta_relativa, md_file.name, contenido, fuente),
             )
             count += 1
-    return {"reglas_indexadas": count}
+    return count
+
+
+def sync() -> dict:
+    """Reindexa las reglas bundleadas en disco (wiki_data) hacia Postgres."""
+    if not MICROSERVICIO_DIR.is_dir():
+        raise WikiError(f"No existe la carpeta esperada: {MICROSERVICIO_DIR}")
+    return {"reglas_indexadas": indexar_carpeta(MICROSERVICIO_DIR, FUENTE_WIKI)}
 
 
 def list_reglas() -> list[dict]:
