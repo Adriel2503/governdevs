@@ -200,6 +200,15 @@ CREATE TABLE IF NOT EXISTS revisiones (
     creado_en      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Idempotencia (simétrica a uq_index_job_commit): GitHub reintenta la entrega
+-- del webhook si tardamos en responder, y un 'synchronize' puede llegar
+-- duplicado. Sin esto, cada reintento inserta otra revisión y termina dejando
+-- OTRO comentario en el mismo PR. El head_commit es lo que identifica el estado
+-- revisado: si el dev pushea de nuevo, el SHA cambia y sí corresponde revisar.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_revision_pr_head
+    ON revisiones (repo_name, pr_numero, head_commit)
+    WHERE head_commit IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_revisiones_repo_pr
     ON revisiones (repo_name, pr_numero);
 

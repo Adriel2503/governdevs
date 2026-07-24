@@ -45,18 +45,29 @@ def crear(
     autor: str | None,
     base_commit: str | None,
     head_commit: str | None,
-) -> str:
-    """Registra la revisión en estado 'generando' y devuelve su id."""
+) -> str | None:
+    """Registra la revisión en estado 'generando' y devuelve su id.
+
+    Devuelve None si ese PR ya fue revisado en ese mismo head_commit: GitHub
+    reintenta la entrega del webhook si tardamos en responder, y sin este corte
+    cada reintento dejaría OTRO comentario en el mismo PR. Es la contraparte de
+    la idempotencia por commit que ya tiene el reindexado (ver cola.encolar).
+
+    Si el dev pushea a la rama, el head_commit cambia y sí se revisa de nuevo.
+    """
     with pg.conn() as c:
         row = c.execute(
             """
             INSERT INTO revisiones (repo_name, pr_numero, rama, autor, base_commit, head_commit, estado)
             VALUES (%s, %s, %s, %s, %s, %s, 'generando')
+            ON CONFLICT (repo_name, pr_numero, head_commit)
+                WHERE head_commit IS NOT NULL
+                DO NOTHING
             RETURNING id
             """,
             (repo_name, pr_numero, rama, autor, base_commit, head_commit),
         ).fetchone()
-    return str(row["id"])
+    return str(row["id"]) if row else None
 
 
 def listar(repo_name: str, limite: int = 20) -> list[dict]:

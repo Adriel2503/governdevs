@@ -101,7 +101,7 @@ def repo_con_webhook():
     repos_db.delete(nombre)
 
 
-def _payload_pr(accion="opened", base="main", numero=7):
+def _payload_pr(accion="opened", base="main", numero=7, head_sha="head123"):
     return json.dumps(
         {
             "action": accion,
@@ -110,7 +110,7 @@ def _payload_pr(accion="opened", base="main", numero=7):
             "pull_request": {
                 "number": numero,
                 "user": {"login": "amadofrias"},
-                "head": {"ref": "feature/nuevo-handler", "sha": "head123"},
+                "head": {"ref": "feature/nuevo-handler", "sha": head_sha},
                 "base": {"ref": base, "sha": "base456"},
             },
         }
@@ -132,6 +132,34 @@ def test_pr_abierto_crea_revision_y_la_encola(repo_con_webhook):
         r["pr_numero"] == 7 and r["rama"] == "feature/nuevo-handler" and r["autor"] == "amadofrias"
         for r in revisiones
     )
+
+
+@REQUIERE_BD
+def test_reintento_del_mismo_pr_no_duplica_la_revision(repo_con_webhook):
+    """GitHub reentrega el webhook si tardamos en responder. Sin el corte de
+    idempotencia, cada reintento dejaría otro comentario en el mismo PR."""
+    nombre, secreto = repo_con_webhook
+    cuerpo = _payload_pr(numero=11)
+    firma = _firmar(secreto, cuerpo)
+
+    primera = webhook.procesar(cuerpo, firma, "pull_request")
+    segunda = webhook.procesar(cuerpo, firma, "pull_request")
+
+    assert primera[0] == 200 and primera[1]["revision_id"]
+    assert segunda[0] == 200 and "reintento" in segunda[1]["message"]
+    assert len([r for r in verificacion.listar(nombre) if r["pr_numero"] == 11]) == 1
+
+
+@REQUIERE_BD
+def test_nuevo_commit_en_el_pr_si_dispara_otra_revision(repo_con_webhook):
+    """El corte es por head_commit: si el dev pushea a la rama, hay que revisar
+    de nuevo."""
+    nombre, secreto = repo_con_webhook
+    for sha in ("sha-uno", "sha-dos"):
+        cuerpo = _payload_pr(accion="synchronize", numero=12, head_sha=sha)
+        assert webhook.procesar(cuerpo, _firmar(secreto, cuerpo), "pull_request")[0] == 200
+
+    assert len([r for r in verificacion.listar(nombre) if r["pr_numero"] == 12]) == 2
 
 
 @REQUIERE_BD

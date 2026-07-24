@@ -149,6 +149,12 @@ def _procesar_pr(repo: dict, payload: dict) -> tuple[int, dict]:
         base_commit=(pr.get("base") or {}).get("sha"),
         head_commit=(pr.get("head") or {}).get("sha"),
     )
+    if revision_id is None:
+        return 200, {
+            "message": "Ese PR ya fue revisado en ese commit (reintento de GitHub)",
+            "repo": repo["name"],
+            "pr": numero,
+        }
     cola.encolar_revision(revision_id)
 
     return 200, {
