@@ -552,6 +552,48 @@ Responde EXCLUSIVAMENTE con un JSON: {{"findings": [{{"archivo": "...", "linea":
     return {"findings": data.get("findings", [])}
 
 
+@app.get("/resumen")
+def resumen():
+    """Los números que responden '¿qué está gobernando esto?' de un vistazo.
+
+    Existe para la pantalla de entrada: antes lo primero que se veía era un
+    formulario de credenciales vacío, o sea la configuración en vez del valor.
+
+    Todo el conteo sale de UNA consulta; los nodos y aristas del grafo se piden
+    a cbm solo para los repos que ya están listos.
+    """
+    from . import pg
+
+    with pg.conn() as c:
+        fila = c.execute(
+            """
+            SELECT (SELECT count(*) FROM repos)                                        AS repos,
+                   (SELECT count(*) FROM repos WHERE status = 'listo')                 AS repos_listos,
+                   (SELECT count(*) FROM lineamientos WHERE es_vigente)                AS lineamientos,
+                   -- De cuántas importaciones distintas vienen. Contar capas no
+                   -- servía: desde que el slug sale de la ruta, cada documento es
+                   -- su propia capa y el número siempre igualaba al de arriba.
+                   (SELECT count(DISTINCT fuente) FROM lineamientos WHERE es_vigente) AS fuentes,
+                   (SELECT count(*) FROM index_jobs WHERE estado = 'ok')               AS reindexados,
+                   (SELECT count(*) FROM revisiones)                                   AS revisiones,
+                   (SELECT count(*) FROM revisiones WHERE estado = 'viola')            AS revisiones_viola
+            """
+        ).fetchone()
+
+    nodos = aristas = 0
+    for repo in repos_db.list_all():
+        if repo["status"] != "listo" or not repo["cbm_project"]:
+            continue
+        try:
+            estado = cbm.index_status(repo["cbm_project"])
+            nodos += estado.get("nodes") or estado.get("node_count") or 0
+            aristas += estado.get("edges") or estado.get("edge_count") or 0
+        except cbm.CbmError:
+            pass  # un repo sin grafo disponible no puede tumbar el resumen
+
+    return {**dict(fila), "nodos": nodos, "aristas": aristas}
+
+
 @app.get("/capacidades")
 def capacidades():
     """Qué funciones están realmente disponibles en ESTE deploy.

@@ -11,6 +11,7 @@
 
 import { getJSON, el } from "./api.js";
 import { toast } from "./toast.js";
+import { EVENTO_CAMBIO, panelVisible } from "./tabs.js";
 
 const POLL_MS = 4000;
 const EN_CURSO = new Set(["encolado", "corriendo", "generando"]);
@@ -146,7 +147,10 @@ export async function refrescarActividad() {
   }
 
   clearTimeout(pollTimer);
-  if (filas.some((f) => EN_CURSO.has(f.estado))) pollTimer = setTimeout(refrescarActividad, POLL_MS);
+  // Solo se sigue consultando si hay trabajo en curso Y el panel está a la vista.
+  if (filas.some((f) => EN_CURSO.has(f.estado)) && panelVisible("panel-actividad")) {
+    pollTimer = setTimeout(refrescarActividad, POLL_MS);
+  }
 }
 
 function pintar(filas) {
@@ -173,6 +177,13 @@ function cambiarVista(nueva) {
 export function initActividad() {
   $("actTabJobs").addEventListener("click", () => cambiarVista("jobs"));
   $("actTabRevs").addEventListener("click", () => cambiarVista("revisiones"));
+
+  // Al volver a la pestaña se refresca: mientras estuvo oculta pudo entrar un
+  // push o abrirse un PR, y lo primero que uno mira es si ya pasó algo.
+  document.addEventListener(EVENTO_CAMBIO, (e) => {
+    if (e.detail.id === "actividad") refrescarActividad();
+  });
+
   pintar([]); // cabecera + estado vacío antes de la primera respuesta
   refrescarActividad();
 }

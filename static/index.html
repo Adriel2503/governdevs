@@ -27,194 +27,282 @@
         <h1>Contexto gobernado para decisiones de ingeniería</h1>
         <p class="lead">Registra las fuentes de código, verifica su estado de indexación y entrega a los equipos de desarrollo reglas y evidencia trazable.</p>
       </div>
-      <div class="workflow" aria-label="Flujo de trabajo">
-        <span class="workflow-step"><strong>01</strong> Administración</span>
-        <span class="workflow-divider"></span>
-        <span class="workflow-step"><strong>02</strong> Desarrollo</span>
-      </div>
     </div>
 
-    <p class="section-label">Administración de fuentes</p>
+    <!-- Antes acá había un indicador decorativo ("01 Administración — 02
+         Desarrollo") que prometía navegación y no hacía nada. Ahora es la
+         navegación real: cada pestaña es UNA tarea. -->
+    <div class="tabs" role="tablist" aria-label="Secciones del hub">
+      <button class="tab" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" type="button">
+        <span class="tab-num">01</span> Resumen
+      </button>
+      <button class="tab" role="tab" id="tab-fuentes" aria-controls="panel-fuentes" aria-selected="false" tabindex="-1" type="button">
+        <span class="tab-num">02</span> Fuentes
+      </button>
+      <button class="tab" role="tab" id="tab-actividad" aria-controls="panel-actividad" aria-selected="false" tabindex="-1" type="button">
+        <span class="tab-num">03</span> Actividad
+      </button>
+      <button class="tab" role="tab" id="tab-lineamientos" aria-controls="panel-lineamientos" aria-selected="false" tabindex="-1" type="button">
+        <span class="tab-num">04</span> Lineamientos
+      </button>
+      <button class="tab" role="tab" id="tab-auditoria" aria-controls="panel-auditoria" aria-selected="false" tabindex="-1" type="button">
+        <span class="tab-num">05</span> Auditoría
+      </button>
+    </div>
 
-    <section class="workspace-panel" aria-labelledby="credsTitle">
-      <div class="panel-header">
-        <div>
-          <h2 id="credsTitle">Credenciales de acceso</h2>
-          <p>Tokens con los que el hub clona los repositorios y registra los webhooks en GitHub.</p>
+    <!-- ==================== 01 · RESUMEN ==================== -->
+    <!-- La pantalla de entrada. Lo primero tiene que ser el valor, no la
+         configuración: qué está gobernando el hub, en números. -->
+    <div class="tab-panel" id="panel-resumen" role="tabpanel" aria-labelledby="tab-resumen">
+      <div class="kpi-grid">
+        <div class="kpi">
+          <span class="kpi-valor" id="kpiRepos">—</span>
+          <span class="kpi-label">Repositorios gobernados</span>
+          <span class="kpi-nota" id="kpiReposNota"></span>
+        </div>
+        <div class="kpi kpi-destacado">
+          <span class="kpi-valor" id="kpiNodos">—</span>
+          <span class="kpi-label">Símbolos en el grafo</span>
+          <span class="kpi-nota" id="kpiAristas"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-valor" id="kpiReglas">—</span>
+          <span class="kpi-label">Lineamientos vigentes</span>
+          <span class="kpi-nota" id="kpiCapas"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-valor" id="kpiRevisiones">—</span>
+          <span class="kpi-label">Verificaciones automáticas</span>
+          <span class="kpi-nota" id="kpiReindexados"></span>
         </div>
       </div>
-      <div class="panel-body">
-        <form id="credForm" class="register-form">
-          <input type="text" id="credAlias" placeholder="Alias (ej. Cuenta de Amado)" required aria-label="Alias de la credencial" />
-          <input type="password" id="credToken" placeholder="Token de acceso personal" required aria-label="Token de acceso personal" />
-          <input type="text" id="credLogin" class="field-name" placeholder="Usuario de GitHub (opcional)" aria-label="Usuario de GitHub" />
-          <button type="submit">Agregar credencial</button>
-        </form>
 
-        <details class="cred-help">
-          <summary>¿Qué permisos necesita el token?</summary>
-          <p>En GitHub: <strong>Settings → Developer settings → Personal access tokens → Fine-grained</strong>, con acceso a los repositorios que quieras vigilar.</p>
-          <table class="mini-table">
-            <thead><tr><th scope="col">Permiso</th><th scope="col">Para qué</th></tr></thead>
-            <tbody>
-              <tr><td><code>Metadata: read</code></td><td>Obligatorio, GitHub lo agrega solo.</td></tr>
-              <tr><td><code>Contents: read</code></td><td>Clonar el repositorio y traer los cambios.</td></tr>
-              <tr><td><code>Webhooks: read &amp; write</code></td><td>Registrar el webhook. <strong>Sin esto no hay actualización automática.</strong></td></tr>
-              <tr><td><code>Pull requests: read &amp; write</code></td><td>Dejar el veredicto como comentario en el PR.</td></tr>
-            </tbody>
-          </table>
-        </details>
+      <section class="workspace-panel" aria-labelledby="comoTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="comoTitle">Cómo funciona</h2>
+            <p>El contexto se mantiene solo. Nadie tiene que acordarse de actualizar nada.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <ol class="flujo">
+            <li>
+              <strong>El admin registra el repositorio.</strong>
+              El hub lo clona, construye el grafo de su código y deja el webhook activo en GitHub.
+            </li>
+            <li>
+              <strong>Cada push a la rama principal reindexa el grafo.</strong>
+              Sin intervención: el contexto que consultan los agentes nunca queda viejo.
+            </li>
+            <li>
+              <strong>Cada pull request recibe una verificación arquitectónica.</strong>
+              Se cruza lo que cambió contra los lineamientos oficiales y el veredicto queda comentado en el PR.
+            </li>
+            <li>
+              <strong>Los desarrolladores consultan por MCP.</strong>
+              Su agente pregunta al hub — el grafo real y las reglas oficiales, no lo que el modelo supone.
+            </li>
+          </ol>
+        </div>
+      </section>
+    </div>
 
-        <div class="table-wrap">
-          <table id="credsTable">
-            <thead>
-              <tr><th scope="col">Alias</th><th scope="col">Tipo</th><th scope="col">GitHub</th><th scope="col">Creada</th><th scope="col">Acciones</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+    <!-- ==================== 01 · FUENTES ==================== -->
+    <div class="tab-panel" id="panel-fuentes" role="tabpanel" aria-labelledby="tab-fuentes">
+      <section class="workspace-panel" aria-labelledby="credsTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="credsTitle">Credenciales de acceso</h2>
+            <p>Tokens con los que el hub clona los repositorios y registra los webhooks en GitHub.</p>
+          </div>
         </div>
-      </div>
-    </section>
+        <div class="panel-body">
+          <form id="credForm" class="register-form">
+            <input type="text" id="credAlias" placeholder="Alias (ej. Cuenta de Amado)" required aria-label="Alias de la credencial" />
+            <input type="password" id="credToken" placeholder="Token de acceso personal" required aria-label="Token de acceso personal" />
+            <input type="text" id="credLogin" class="field-name" placeholder="Usuario de GitHub (opcional)" aria-label="Usuario de GitHub" />
+            <button type="submit">Agregar credencial</button>
+          </form>
 
-    <section class="workspace-panel" aria-labelledby="reposTitle">
-      <div class="panel-header">
-        <div>
-          <h2 id="reposTitle">Repositorios indexados</h2>
-          <p>Control de las fuentes disponibles para los asistentes y las auditorías.</p>
-        </div>
-      </div>
-      <div class="metrics" aria-label="Resumen de repositorios">
-        <div class="metric"><span class="metric-value" id="repoCount">0</span><span class="metric-label">Repositorios registrados</span></div>
-        <div class="metric"><span class="metric-value" id="readyCount">0</span><span class="metric-label">Listos para consulta</span></div>
-        <div class="metric"><span class="metric-value" id="indexingCount">0</span><span class="metric-label">En proceso de indexación</span></div>
-      </div>
-      <div class="panel-body">
-        <form id="registerForm" class="register-form">
-          <input type="text" id="source" placeholder="URL Git o ruta local autorizada" required aria-label="URL Git o ruta local" />
-          <input type="text" id="name" class="field-name" placeholder="Identificador (opcional)" aria-label="Identificador del repositorio" />
-          <button type="submit">Registrar repositorio</button>
-        </form>
-        <div class="register-options">
-          <label class="field">
-            <span>Credencial</span>
-            <select id="repoCredencial" aria-label="Credencial para clonar y registrar el webhook"></select>
-          </label>
-          <label class="field">
-            <span>Rama vigilada</span>
-            <input type="text" id="repoRama" value="main" aria-label="Rama vigilada" />
-          </label>
-          <label class="field field-grow">
-            <span>Rutas vigiladas <span class="muted">(opcional)</span></span>
-            <input type="text" id="repoWatch" placeholder="src/**, *.cs — vacío vigila todo" aria-label="Rutas vigiladas" />
-          </label>
-        </div>
-        <div class="table-wrap">
-          <table id="reposTable">
-            <thead>
-              <tr><th scope="col">Repositorio</th><th scope="col">Estado</th><th scope="col">Rama</th><th scope="col">Sync</th><th scope="col">Nodos</th><th scope="col">Aristas</th><th scope="col">Acciones</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+          <details class="cred-help">
+            <summary>¿Qué permisos necesita el token?</summary>
+            <p>En GitHub: <strong>Settings → Developer settings → Personal access tokens → Fine-grained</strong>, con acceso a los repositorios que quieras vigilar.</p>
+            <table class="mini-table">
+              <thead><tr><th scope="col">Permiso</th><th scope="col">Para qué</th></tr></thead>
+              <tbody>
+                <tr><td><code>Metadata: read</code></td><td>Obligatorio, GitHub lo agrega solo.</td></tr>
+                <tr><td><code>Contents: read</code></td><td>Clonar el repositorio y traer los cambios.</td></tr>
+                <tr><td><code>Webhooks: read &amp; write</code></td><td>Registrar el webhook. <strong>Sin esto no hay actualización automática.</strong></td></tr>
+                <tr><td><code>Pull requests: read &amp; write</code></td><td>Dejar el veredicto como comentario en el PR.</td></tr>
+              </tbody>
+            </table>
+          </details>
 
-    <section class="workspace-panel" aria-labelledby="actividadTitle">
-      <div class="panel-header">
-        <div>
-          <h2 id="actividadTitle">Actividad de sincronización</h2>
-          <p>Cada push a la rama vigilada reindexa el grafo; cada pull request recibe una verificación arquitectónica.</p>
-        </div>
-        <div class="import-modes" role="group" aria-label="Tipo de actividad">
-          <button class="secondary btn-sm" id="actTabJobs" type="button" aria-pressed="true">Reindexados</button>
-          <button class="secondary btn-sm" id="actTabRevs" type="button" aria-pressed="false">Revisiones de PR</button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="table-wrap">
-          <table id="actividadTable">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section class="workspace-panel" aria-labelledby="importTitle">
-      <div class="panel-header">
-        <div>
-          <h2 id="importTitle">Lineamientos oficiales</h2>
-          <p>Importa la documentación de arquitectura desde un repositorio o un archivo ZIP, y elige qué carpeta indexar.</p>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="import-modes" role="group" aria-label="Fuente de los lineamientos">
-          <button class="secondary btn-sm" id="importModeGit" type="button" aria-pressed="true">Desde repositorio</button>
-          <button class="secondary btn-sm" id="importModeZip" type="button" aria-pressed="false">Subir ZIP</button>
-        </div>
-        <form id="importGitForm" class="import-form">
-          <input type="text" id="importUrl" placeholder="URL del repositorio (https://github.com/…)" aria-label="URL del repositorio" />
-          <input type="password" id="importToken" placeholder="Token de acceso (opcional, repos privados)" aria-label="Token de acceso" />
-          <button type="submit" class="secondary">Escanear</button>
-        </form>
-        <form id="importZipForm" class="import-form" hidden>
-          <!-- El control nativo de archivos no se puede estilar; se oculta y se
-               dispara desde el label, que sí hereda el diseño del resto. -->
-          <label class="file-picker secondary btn-sm" for="importZipFile">Elegir archivo ZIP</label>
-          <input type="file" id="importZipFile" class="visually-hidden" accept=".zip" aria-label="Archivo ZIP de la wiki" />
-          <span class="muted" id="importZipName">Ningún archivo elegido</span>
-          <button type="submit" class="secondary">Escanear ZIP</button>
-        </form>
-        <div class="import-result" id="importResult" aria-live="polite"></div>
-
-        <div class="fuentes-bloque">
-          <h3 class="fuentes-titulo">Importaciones cargadas</h3>
           <div class="table-wrap">
-            <table id="fuentesTable">
+            <table id="credsTable">
               <thead>
-                <tr><th scope="col">Fuente</th><th scope="col">Carpeta indexada</th><th scope="col">Documentos</th><th scope="col">Acciones</th></tr>
+                <tr><th scope="col">Alias</th><th scope="col">Tipo</th><th scope="col">GitHub</th><th scope="col">Creada</th><th scope="col">Acciones</th></tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <p class="section-label">Contexto para desarrollo</p>
-    <section class="developer-grid" aria-label="Herramientas para desarrolladores">
-      <div class="subpanel">
-        <div class="subpanel-head">
+      <section class="workspace-panel" aria-labelledby="reposTitle">
+        <div class="panel-header">
           <div>
-            <h3>Lineamientos de arquitectura</h3>
-            <p class="subpanel-sub">Arquetipo Microservicio · Fuente oficial</p>
+            <h2 id="reposTitle">Repositorios indexados</h2>
+            <p>Control de las fuentes disponibles para los asistentes y las auditorías.</p>
+          </div>
+        </div>
+        <div class="metrics" aria-label="Resumen de repositorios">
+          <div class="metric"><span class="metric-value" id="repoCount">0</span><span class="metric-label">Repositorios registrados</span></div>
+          <div class="metric"><span class="metric-value" id="readyCount">0</span><span class="metric-label">Listos para consulta</span></div>
+          <div class="metric"><span class="metric-value" id="indexingCount">0</span><span class="metric-label">En proceso de indexación</span></div>
+        </div>
+        <div class="panel-body">
+          <form id="registerForm" class="register-form">
+            <input type="text" id="source" placeholder="URL Git o ruta local autorizada" required aria-label="URL Git o ruta local" />
+            <input type="text" id="name" class="field-name" placeholder="Identificador (opcional)" aria-label="Identificador del repositorio" />
+            <button type="submit">Registrar repositorio</button>
+          </form>
+          <div class="register-options">
+            <label class="field">
+              <span>Credencial</span>
+              <select id="repoCredencial" aria-label="Credencial para clonar y registrar el webhook"></select>
+            </label>
+            <label class="field">
+              <span>Rama vigilada</span>
+              <input type="text" id="repoRama" value="main" aria-label="Rama vigilada" />
+            </label>
+            <label class="field field-grow">
+              <span>Rutas vigiladas <span class="muted">(opcional)</span></span>
+              <input type="text" id="repoWatch" placeholder="src/**, *.cs — vacío vigila todo" aria-label="Rutas vigiladas" />
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table id="reposTable">
+              <thead>
+                <tr><th scope="col">Repositorio</th><th scope="col">Estado</th><th scope="col">Rama</th><th scope="col">Sync</th><th scope="col">Nodos</th><th scope="col">Aristas</th><th scope="col">Acciones</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== 02 · ACTIVIDAD ==================== -->
+    <div class="tab-panel" id="panel-actividad" role="tabpanel" aria-labelledby="tab-actividad" hidden>
+      <section class="workspace-panel" aria-labelledby="actividadTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="actividadTitle">Actividad de sincronización</h2>
+            <p>Cada push a la rama vigilada reindexa el grafo; cada pull request recibe una verificación arquitectónica.</p>
+          </div>
+          <div class="import-modes" role="group" aria-label="Tipo de actividad">
+            <button class="secondary btn-sm" id="actTabJobs" type="button" aria-pressed="true">Reindexados</button>
+            <button class="secondary btn-sm" id="actTabRevs" type="button" aria-pressed="false">Revisiones de PR</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="table-wrap">
+            <table id="actividadTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== 03 · LINEAMIENTOS ==================== -->
+    <div class="tab-panel" id="panel-lineamientos" role="tabpanel" aria-labelledby="tab-lineamientos" hidden>
+      <section class="workspace-panel" aria-labelledby="importTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="importTitle">Lineamientos oficiales</h2>
+            <p>Importa la documentación de arquitectura desde un repositorio o un archivo ZIP, y elige qué carpeta indexar.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="import-modes" role="group" aria-label="Fuente de los lineamientos">
+            <button class="secondary btn-sm" id="importModeGit" type="button" aria-pressed="true">Desde repositorio</button>
+            <button class="secondary btn-sm" id="importModeZip" type="button" aria-pressed="false">Subir ZIP</button>
+          </div>
+          <form id="importGitForm" class="import-form">
+            <input type="text" id="importUrl" placeholder="URL del repositorio (https://github.com/…)" aria-label="URL del repositorio" />
+            <input type="password" id="importToken" placeholder="Token de acceso (opcional, repos privados)" aria-label="Token de acceso" />
+            <button type="submit" class="secondary">Escanear</button>
+          </form>
+          <form id="importZipForm" class="import-form" hidden>
+            <!-- El control nativo de archivos no se puede estilar; se oculta y se
+                 dispara desde el label, que sí hereda el diseño del resto. -->
+            <label class="file-picker secondary btn-sm" for="importZipFile">Elegir archivo ZIP</label>
+            <input type="file" id="importZipFile" class="visually-hidden" accept=".zip" aria-label="Archivo ZIP de la wiki" />
+            <span class="muted" id="importZipName">Ningún archivo elegido</span>
+            <button type="submit" class="secondary">Escanear ZIP</button>
+          </form>
+          <div class="import-result" id="importResult" aria-live="polite"></div>
+
+          <div class="fuentes-bloque">
+            <h3 class="fuentes-titulo">Importaciones cargadas</h3>
+            <div class="table-wrap">
+              <table id="fuentesTable">
+                <thead>
+                  <tr><th scope="col">Fuente</th><th scope="col">Carpeta indexada</th><th scope="col">Documentos</th><th scope="col">Acciones</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-panel" aria-labelledby="reglasTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="reglasTitle">Explorar reglas</h2>
+            <p>Lo que un agente recibe por MCP, servido verbatim. Búsqueda BM25 sobre todo el contenido.</p>
           </div>
           <span class="pill-count" id="reglasCount"></span>
         </div>
-        <div class="wiki-actions">
-          <button class="secondary" id="syncWikiBtn" type="button">Sincronizar fuente</button>
-          <span class="muted" id="wikiSyncStatus" aria-live="polite"></span>
+        <div class="panel-body">
+          <div class="wiki-actions">
+            <button class="secondary" id="syncWikiBtn" type="button">Sincronizar fuente</button>
+            <span class="muted" id="wikiSyncStatus" aria-live="polite"></span>
+          </div>
+          <div class="reglas-list" id="reglasList"></div>
+          <form id="buscarForm" class="search-form">
+            <input type="text" id="buscarQuery" placeholder="Buscar una regla o convención" aria-label="Buscar en las reglas" />
+            <button type="submit" class="secondary">Buscar</button>
+          </form>
+          <div class="search-results" id="buscarResults"></div>
         </div>
-        <div class="reglas-list" id="reglasList"></div>
-        <form id="buscarForm" class="search-form">
-          <input type="text" id="buscarQuery" placeholder="Buscar una regla o convención" aria-label="Buscar en las reglas" />
-          <button type="submit" class="secondary">Buscar</button>
-        </form>
-        <div class="search-results" id="buscarResults"></div>
-      </div>
+      </section>
+    </div>
 
-      <div class="subpanel" id="auditPanel">
-        <h3>Auditoría de módulo</h3>
-        <p class="subpanel-sub">Contrasta código indexado y lineamientos oficiales para priorizar incumplimientos.</p>
-        <p class="aviso" id="auditAviso" hidden></p>
-        <form id="auditForm">
-          <input type="text" id="auditRepo" placeholder="Repositorio registrado" required aria-label="Repositorio a auditar" />
-          <input type="text" id="auditModulo" placeholder="Módulo a evaluar" required aria-label="Módulo a evaluar" />
-          <button type="submit">Ejecutar auditoría</button>
-        </form>
-        <div class="audit-results" id="auditResult"></div>
-      </div>
-    </section>
+    <!-- ==================== 04 · AUDITORÍA ==================== -->
+    <div class="tab-panel" id="panel-auditoria" role="tabpanel" aria-labelledby="tab-auditoria" hidden>
+      <section class="workspace-panel" id="auditPanel" aria-labelledby="auditTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="auditTitle">Auditoría de módulo</h2>
+            <p>Contrasta código indexado y lineamientos oficiales para priorizar incumplimientos.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <p class="aviso" id="auditAviso" hidden></p>
+          <form id="auditForm">
+            <input type="text" id="auditRepo" placeholder="Repositorio registrado" required aria-label="Repositorio a auditar" />
+            <input type="text" id="auditModulo" placeholder="Módulo a evaluar" required aria-label="Módulo a evaluar" />
+            <button type="submit">Ejecutar auditoría</button>
+          </form>
+          <div class="audit-results" id="auditResult"></div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <script type="module" src="/js/main.js"></script>

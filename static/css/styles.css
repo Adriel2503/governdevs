@@ -475,3 +475,82 @@ td.actions button + button { margin-left: 6px; }
 .fuentes-bloque { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
 .fuentes-titulo { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 #fuentesTable { min-width: 520px; }
+
+/* --- Pestañas --- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 26px 0 18px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;           /* en pantallas chicas se desplazan, no se apilan */
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;   /* el subrayado marca la activa */
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.tab:hover { background: var(--surface-2); color: var(--ink); }
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--brand);
+  background: transparent;
+}
+.tab-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tab[aria-selected="true"] .tab-num { color: var(--brand); }
+
+/* Los paneles de una misma pestaña se separan entre sí. */
+.tab-panel > .workspace-panel + .workspace-panel { margin-top: 18px; }
+
+/* --- Resumen: la pantalla de entrada --- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+/* El grafo es el argumento central: se destaca sin gritar. */
+.kpi-destacado { border-color: var(--teal); }
+.kpi-valor {
+  font-size: 34px;
+  font-weight: 780;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.kpi-destacado .kpi-valor { color: var(--teal-ink); }
+.kpi-label { font-size: 13px; font-weight: 650; }
+.kpi-nota { font-size: 12px; color: var(--muted); min-height: 17px; }
+
+.flujo { margin: 0; padding-left: 22px; display: grid; gap: 12px; }
+.flujo li { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.flujo strong { display: block; color: var(--ink); font-weight: 650; }

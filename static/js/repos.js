@@ -6,6 +6,7 @@ import { getJSON, postJSON, del, el } from "./api.js";
 import { toast } from "./toast.js";
 import { alCambiarCredenciales } from "./credenciales.js";
 import { refrescarActividad } from "./actividad.js";
+import { EVENTO_CAMBIO, panelVisible } from "./tabs.js";
 
 const POLL_MS = 4000;
 let pollTimer = null;
@@ -131,7 +132,8 @@ async function refreshRepos() {
 function schedulePoll(repos) {
   const inFlight = repos.some((r) => r.status === "indexando" || r.status === "registrado");
   clearTimeout(pollTimer);
-  if (inFlight) pollTimer = setTimeout(refreshRepos, POLL_MS);
+  // Igual que en actividad: nada de consultar en bucle un panel que está oculto.
+  if (inFlight && panelVisible("panel-fuentes")) pollTimer = setTimeout(refreshRepos, POLL_MS);
 }
 
 async function removeRepo(name) {
@@ -219,5 +221,10 @@ export function initRepos() {
   skeletonRows(document.querySelector("#reposTable tbody"));
   bindForm();
   alCambiarCredenciales(poblarCredenciales);
+
+  document.addEventListener(EVENTO_CAMBIO, (e) => {
+    if (e.detail.id === "fuentes") refreshRepos(); // pudo terminar un indexado
+  });
+
   refreshRepos();
 }
