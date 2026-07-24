@@ -39,7 +39,7 @@ export function openModal({ title, path, content }) {
   backdrop.querySelector("button").focus();
 }
 
-export function closeModal() {
+function closeModal() {
   if (!backdrop) return;
   backdrop.classList.remove("open");
   if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();

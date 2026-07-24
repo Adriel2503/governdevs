@@ -214,7 +214,8 @@ responde el sub-app por el recorte de prefijo del Mount de Starlette.
 |---|---|
 | `POST /credenciales` · `GET` · `DELETE /{id}` | PAT cifrados. El token **nunca** vuelve por la API. |
 | `POST /repos` | Registra un repo: clona, encola el indexado y auto-registra el webhook. |
-| `GET /repos` · `/{name}/status` · `/{name}/arch` · `/{name}/graph-ui` | Estado y navegación del grafo. |
+| `GET /repos` · `/{name}/status` · `/{name}/graph-ui` | Estado y navegación del grafo. |
+| `GET /wiki/fuentes` · `DELETE /wiki/fuentes?fuente=…` | Qué lotes de lineamientos hay y cómo quitarlos. |
 | `GET /repos/{name}/jobs` · `/revisiones` | Historial de reindexados y de verificaciones de PR. |
 | `DELETE /repos/{name}` | Borra grafo, webhook en GitHub y clon local. |
 | `POST /webhooks/github` | Receptor: HMAC sobre el **raw body**, ruteo push/PR. |

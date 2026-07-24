@@ -9,8 +9,6 @@ el motor real. Si el motor cambia, solo este archivo se toca.
 """
 
 import json
-import os
-import shutil
 import socket
 import subprocess
 
@@ -64,10 +62,6 @@ def _run(tool: str, payload: dict | None = None, timeout: int | None = None) -> 
         return json.loads(result.stdout)
     except json.JSONDecodeError as e:
         raise CbmError(f"cbm cli {tool} devolvió salida no-JSON: {result.stdout!r}") from e
-
-
-def is_available() -> bool:
-    return shutil.which(CBM_BIN) is not None or os.path.isfile(CBM_BIN)
 
 
 def index_repository(repo_path: str) -> dict:

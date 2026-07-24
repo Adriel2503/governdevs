@@ -235,14 +235,6 @@ def repo_status(name: str):
     return repo
 
 
-@app.get("/repos/{name}/arch")
-def repo_architecture(name: str):
-    repo = repos_db.get(name)
-    if repo is None or not repo["cbm_project"]:
-        raise HTTPException(404, "Repo no indexado todavía")
-    return cbm.get_architecture(repo["cbm_project"])
-
-
 @app.get("/repos/{name}/graph-ui")
 def repo_graph_ui(name: str):
     """Redirige a la UI 3D que el propio binario cbm sirve (no reimplementamos

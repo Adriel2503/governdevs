@@ -170,11 +170,6 @@ def arrancar_worker() -> None:
         _worker.start()
 
 
-def esperar_vacia(timeout: float | None = None) -> None:
-    """Solo para tests: bloquea hasta que la cola se drene."""
-    _cola.join()
-
-
 def _norm(row: dict) -> dict:
     d = dict(row)
     d["id"] = str(d["id"])

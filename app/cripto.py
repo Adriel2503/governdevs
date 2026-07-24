@@ -46,8 +46,3 @@ def descifrar(token: str) -> str:
         raise RuntimeError(
             "No se pudo descifrar el secreto (¿cambió CREDENTIALS_KEY?)."
         ) from e
-
-
-def generar_clave() -> str:
-    """Utilidad para el operador (generar la clave), no para el runtime."""
-    return Fernet.generate_key().decode()

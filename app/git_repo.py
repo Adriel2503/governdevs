@@ -148,8 +148,3 @@ def commit_actual(dest: Path, ref: str = "HEAD") -> str:
     return _run(["rev-parse", ref], desc="rev-parse", cwd=dest)
 
 
-def archivos_cambiados(dest: Path, base: str, head: str) -> list[str]:
-    """Archivos que difieren entre `base` y `head` (three-dot: desde que
-    divergieron), que es exactamente el conjunto que introduce una rama/PR."""
-    out = _run(["diff", "--name-only", f"{base}...{head}"], desc="diff", cwd=dest)
-    return [line for line in out.splitlines() if line.strip()]

@@ -21,8 +21,6 @@ export function alCambiarCredenciales(fn) {
   fn(ultimas); // estado actual, para que el suscriptor no arranque vacío
 }
 
-export const credencialesActuales = () => ultimas;
-
 function fecha(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -58,7 +56,7 @@ function renderRow(cred) {
   ]);
 }
 
-export async function refrescarCredenciales() {
+async function refrescarCredenciales() {
   let creds;
   try {
     creds = await getJSON("/credenciales");

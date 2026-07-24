@@ -99,7 +99,7 @@ async function withGraphCounts(repos) {
   return repos;
 }
 
-export async function refreshRepos() {
+async function refreshRepos() {
   let repos;
   try {
     repos = await getJSON("/repos");
