@@ -16,7 +16,5 @@ from pathlib import Path
 
 _BASE = Path(tempfile.gettempdir()) / "context-hub-tests"
 (_BASE / "workspace").mkdir(parents=True, exist_ok=True)
-(_BASE / "data").mkdir(parents=True, exist_ok=True)
 
 os.environ.setdefault("WORKSPACE_DIR", str(_BASE / "workspace"))
-os.environ.setdefault("DATA_DIR", str(_BASE / "data"))

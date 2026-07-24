@@ -65,8 +65,12 @@ class Settings(BaseSettings):
     # consumo grande. Pasado el límite se responde 413 con un mensaje claro.
     max_upload_mb: int = 500
 
-    # Persistencia y datos temporales
-    data_dir: str = str(PROJECT_ROOT / "data")
+    # Rutas en disco.
+    #
+    # No hay `data_dir`: existía para las bases SQLite (repos.db, wiki_index.db)
+    # y quedó sin uso al migrar a Postgres. En el contenedor /app/data sigue
+    # siendo el volumen — pero por HOME (ahí guarda cbm el grafo) y porque
+    # WORKSPACE_DIR cuelga de él, no por esta configuración.
     workspace_dir: str = str(PROJECT_ROOT / "workspace")
     static_dir: str = str(PROJECT_ROOT / "static")
 

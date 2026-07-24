@@ -17,12 +17,16 @@ wheels/
 
 # Datos de runtime — persisten por volumen en Dokploy (el estado vive en
 # Postgres, no acá).
-# data/      -> store del grafo de cbm ($HOME) + WORKSPACE_DIR en producción
+#
 # workspace/ -> clones PERSISTENTES de los repos vigilados (el reindexado
 #               incremental hace fetch sobre ellos) y descargas temporales del
 #               importador de lineamientos
-data/
+# data/      -> en LOCAL ya no se usa: tenía las bases SQLite de antes de migrar
+#               a Postgres. Se sigue ignorando por si reaparece. En el CONTENEDOR
+#               /app/data es otra cosa y sí está vivo: es HOME (ahí guarda cbm el
+#               grafo) y de él cuelga WORKSPACE_DIR.
 workspace/
+data/
 
 # Lineamientos oficiales — NO se versionan en este repo (contenido interno de
 # Real Plaza). Deben proveerse aparte en el deploy (volumen o copia al construir
