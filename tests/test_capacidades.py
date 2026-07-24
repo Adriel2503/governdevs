@@ -19,53 +19,22 @@ REQUIERE_BD = pytest.mark.skipif(
 # --- /capacidades ------------------------------------------------------------
 
 
-def test_sin_api_key_la_auditoria_no_esta_disponible(monkeypatch, tmp_path):
+def test_sin_api_key_la_auditoria_no_esta_disponible(monkeypatch):
+    """Con esto en False el frontend saca la pestaña de Auditoría: mejor no
+    ofrecerla que ofrecer un formulario que devuelve 500."""
     from app import main
 
     monkeypatch.setattr(settings, "anthropic_api_key", None)
-    monkeypatch.setattr(settings, "wiki_microservicio_dir", str(tmp_path))
 
-    assert main.capacidades() == {"auditoria": False, "wiki_bundle": False}
+    assert main.capacidades() == {"auditoria": False}
 
 
-def test_con_api_key_la_auditoria_esta_disponible(monkeypatch, tmp_path):
+def test_con_api_key_la_auditoria_esta_disponible(monkeypatch):
     from app import main
 
     monkeypatch.setattr(settings, "anthropic_api_key", "sk-ant-loquesea")
-    monkeypatch.setattr(settings, "wiki_microservicio_dir", str(tmp_path))
 
     assert main.capacidades()["auditoria"] is True
-
-
-def test_carpeta_vacia_no_cuenta_como_wiki_bundleada(monkeypatch, tmp_path):
-    """Existe el directorio pero no hay .md: sincronizar no traería nada, así que
-    el frontend tiene que mandar al importador."""
-    from app import main
-
-    monkeypatch.setattr(settings, "anthropic_api_key", None)
-    monkeypatch.setattr(settings, "wiki_microservicio_dir", str(tmp_path))
-
-    assert main.capacidades()["wiki_bundle"] is False
-
-
-def test_detecta_los_md_en_subcarpetas(monkeypatch, tmp_path):
-    from app import main
-
-    (tmp_path / "capa").mkdir()
-    (tmp_path / "capa" / "handlers.md").write_text("# Handlers", encoding="utf-8")
-    monkeypatch.setattr(settings, "anthropic_api_key", None)
-    monkeypatch.setattr(settings, "wiki_microservicio_dir", str(tmp_path))
-
-    assert main.capacidades()["wiki_bundle"] is True
-
-
-def test_carpeta_inexistente_no_rompe(monkeypatch, tmp_path):
-    from app import main
-
-    monkeypatch.setattr(settings, "anthropic_api_key", None)
-    monkeypatch.setattr(settings, "wiki_microservicio_dir", str(tmp_path / "no-existe"))
-
-    assert main.capacidades()["wiki_bundle"] is False
 
 
 # --- webhook_activo ----------------------------------------------------------

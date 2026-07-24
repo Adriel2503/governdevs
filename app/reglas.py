@@ -6,12 +6,13 @@ Antes: SQLite FTS5 (tabla `reglas`). Ahora: Postgres/ParadeDB con `pg_search`
 no el resultado: `MATCH ... ORDER BY rank` (FTS5) → `@@@ ... ORDER BY
 paradedb.score(id)` (pg_search).
 
-Se mantienen la API pública (sync, list_reglas, get_regla, buscar) y los shapes
-de retorno para no tocar main.py ni mcp_server.py.
+Se mantienen la API pública (list_reglas, get_regla, buscar) y los shapes de
+retorno para no tocar main.py ni mcp_server.py.
 
-Fuente de contenido: por ahora los .md bundleados en wiki_data/ — `sync()` los
-relee e inserta/actualiza en `lineamientos`. En la Fase 1 (import) se suma la
-importación desde una URL de GitHub, que reusa la misma tabla.
+Fuente de contenido: SIEMPRE el importador — un repo de GitHub o un ZIP subido.
+Antes existía además `sync()`, que releía unos .md horneados en la imagen; se
+quitó porque la wiki de Real Plaza es confidencial y nunca se bundlea, así que
+ese camino estaba muerto en cualquier deploy real y duplicaba el otro.
 
 Las reglas NO se resumen ni pasan por LLM: son la norma, se sirven tal cual.
 """
@@ -23,10 +24,6 @@ from urllib.parse import unquote
 import psycopg
 
 from . import pg
-from .config import settings
-
-MICROSERVICIO_DIR = Path(settings.wiki_microservicio_dir)
-FUENTE_WIKI = "wiki_data/Microservicio"
 
 
 class WikiError(RuntimeError):
@@ -129,13 +126,6 @@ def indexar_carpeta(base_dir: Path, fuente: str) -> int:
             )
             count += 1
     return count
-
-
-def sync() -> dict:
-    """Reindexa las reglas bundleadas en disco (wiki_data) hacia Postgres."""
-    if not MICROSERVICIO_DIR.is_dir():
-        raise WikiError(f"No existe la carpeta esperada: {MICROSERVICIO_DIR}")
-    return {"reglas_indexadas": indexar_carpeta(MICROSERVICIO_DIR, FUENTE_WIKI)}
 
 
 def listar_fuentes() -> list[dict]:

@@ -1,7 +1,7 @@
-// Panel de lineamientos: chips por regla, visor en modal y búsqueda FTS5 con
-// resaltado seguro (sin innerHTML) de los fragmentos que devuelve el backend.
+// Bloque "Reglas indexadas": un chip por regla, visor en modal y búsqueda BM25
+// con resaltado seguro (sin innerHTML) de los fragmentos que devuelve el backend.
 
-import { getJSON, postJSON, el } from "./api.js";
+import { getJSON, el } from "./api.js";
 import { toast } from "./toast.js";
 import { openModal } from "./modal.js";
 
@@ -17,22 +17,6 @@ function displayName(archivo) {
 }
 
 let activeChip = null;
-
-// "Sincronizar fuente" lee los .md bundleados en el contenedor. Si no están
-// montados (el deploy los trata como confidenciales y no los hornea en la
-// imagen), el botón no sirve y el estado vacío tiene que mandar al importador,
-// que es el camino que sí funciona.
-let wikiBundleada = true;
-
-export function aplicarCapacidades(caps) {
-  if (caps?.wiki_bundle !== false) return;
-  wikiBundleada = false;
-
-  const btn = $("syncWikiBtn");
-  btn.disabled = true;
-  btn.setAttribute("title", "No hay lineamientos montados en el servidor: importalos desde un repositorio o un ZIP.");
-  refreshReglas(); // repinta el estado vacío con el texto correcto
-}
 
 async function openRegla(capa, chip) {
   try {
@@ -53,12 +37,7 @@ export async function refreshReglas() {
     $("reglasCount").textContent = reglas.length ? `${reglas.length} reglas` : "";
     if (!reglas.length) {
       list.replaceChildren(
-        el("span", {
-          class: "muted",
-          text: wikiBundleada
-            ? "Sin reglas indexadas. Usa “Sincronizar fuente”."
-            : "Sin reglas indexadas. Importalas desde “Lineamientos oficiales”, arriba.",
-        })
+        el("span", { class: "muted", text: "Sin reglas indexadas todavía. Importalas con «Escanear», arriba." })
       );
       return;
     }
@@ -110,28 +89,7 @@ function bindSearch() {
   });
 }
 
-function bindSync() {
-  $("syncWikiBtn").addEventListener("click", async () => {
-    const status = $("wikiSyncStatus");
-    const btn = $("syncWikiBtn");
-    btn.disabled = true;
-    status.textContent = "Sincronizando…";
-    try {
-      const r = await postJSON("/wiki/sync", {});
-      status.textContent = `${r.reglas_indexadas} reglas indexadas`;
-      toast("Lineamientos reindexados.");
-      refreshReglas();
-    } catch (e) {
-      status.textContent = "";
-      toast(`Error al sincronizar: ${e.message}`, { type: "error" });
-    } finally {
-      btn.disabled = false;
-    }
-  });
-}
-
 export function initReglas() {
   bindSearch();
-  bindSync();
   refreshReglas();
 }

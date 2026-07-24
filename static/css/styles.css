@@ -53,6 +53,14 @@
 
 * { box-sizing: border-box; }
 
+/* `hidden` tiene que ganarle a CUALQUIER clase que fije `display`.
+   El navegador lo aplica desde su hoja de estilos, así que una sola regla de
+   autor con clase (`.import-form { display: flex }`) lo anula sin avisar: los
+   DOS formularios de importación quedaban visibles a la vez y el conmutador
+   "Desde repositorio / Subir ZIP" no parecía hacer nada. Que sea global evita
+   que el próximo panel con `display` caiga en la misma trampa. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   min-width: 320px;
@@ -220,9 +228,6 @@ td.actions button + button { margin-left: 6px; }
 .subpanel-sub { margin: 0 0 14px; color: var(--muted); font-size: 12px; }
 .pill-count { color: var(--muted); font-size: 12px; font-weight: 600; }
 
-.wiki-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-#wikiSyncStatus { font-size: 12px; }
-
 .reglas-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .regla-chip {
   min-height: 30px;
@@ -358,7 +363,16 @@ td.actions button + button { margin-left: 6px; }
 }
 
 /* --- Import de lineamientos --- */
-.import-modes { display: flex; gap: 8px; margin-bottom: 14px; }
+/* Conmutador de dos opciones (fuente del import, tipo de actividad).
+   Sin estado visible, `aria-pressed` solo existía para el lector de pantalla:
+   los dos botones se veían idénticos y no había forma de saber en qué modo
+   estabas. */
+.segmented { display: flex; gap: 8px; margin-bottom: 14px; }
+.segmented button[aria-pressed="true"] {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
 .import-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
 .import-form input[type="text"], .import-form input[type="password"] { flex: 1 1 240px; }
 .import-form input[type="file"] { flex: 1 1 240px; padding: 8px; }
@@ -472,8 +486,12 @@ td.actions button + button { margin-left: 6px; }
 }
 
 /* --- Importaciones cargadas --- */
-.fuentes-bloque { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
-.fuentes-titulo { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+/* Subsección dentro de un panel: importar → cargadas → indexadas son tres
+   momentos de la MISMA tarea, así que van en un panel con separadores y no en
+   tres tarjetas que se leen como funciones distintas. */
+.bloque { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.bloque-titulo { margin: 0 0 4px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.bloque-ayuda { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
 #fuentesTable { min-width: 520px; }
 
 /* --- Pestañas --- */

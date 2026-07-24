@@ -60,20 +60,37 @@ export function panelVisible(idPanel) {
   return !!p && !p.hidden;
 }
 
+// Una pestaña que lleva a un formulario deshabilitado es peor que no tenerla:
+// ocupa un lugar en la navegación y no cumple. Si el deploy no soporta esa
+// función, la sacamos del DOM (vuelve sola cuando la capacidad se enciende).
+export function quitarPestana(id) {
+  const tab = document.getElementById(`tab-${id}`);
+  if (!tab) return;
+  const panel = document.getElementById(tab.getAttribute("aria-controls"));
+  const eraLaActiva = tab.getAttribute("aria-selected") === "true";
+
+  tab.remove();
+  panel?.remove();
+  if (eraLaActiva) activar(pestanaActiva()); // si no, quedaría sin ninguna visible
+}
+
 function bindTeclado(tabs) {
   const MOVIMIENTOS = { ArrowRight: 1, ArrowLeft: -1 };
   for (const t of tabs) {
     t.addEventListener("keydown", (e) => {
+      // Se releen en cada tecla: una capacidad apagada puede haber quitado una
+      // pestaña después del bind, y navegar hacia una que ya no existe no anda.
+      const vivas = pestanas();
       if (e.key === "Home" || e.key === "End") {
         e.preventDefault();
-        activar(idCorto(e.key === "Home" ? tabs[0] : tabs[tabs.length - 1]), { foco: true });
+        activar(idCorto(e.key === "Home" ? vivas[0] : vivas[vivas.length - 1]), { foco: true });
         return;
       }
       const paso = MOVIMIENTOS[e.key];
       if (!paso) return;
       e.preventDefault();
-      const i = tabs.indexOf(t);
-      const siguiente = tabs[(i + paso + tabs.length) % tabs.length]; // circular
+      const i = vivas.indexOf(t);
+      const siguiente = vivas[(i + paso + vivas.length) % vivas.length]; // circular
       activar(idCorto(siguiente), { foco: true });
     });
   }

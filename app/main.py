@@ -334,14 +334,6 @@ def eliminar_credencial(credential_id: str):
 # --- Lineamientos (wiki) ---------------------------------------------------
 
 
-@app.post("/wiki/sync")
-def wiki_sync():
-    try:
-        return wiki.sync()
-    except wiki.WikiError as e:
-        raise HTTPException(500, str(e))
-
-
 @app.get("/wiki/fuentes")
 def wiki_fuentes():
     """Los lotes de lineamientos importados, para poder quitarlos."""
@@ -598,16 +590,11 @@ def resumen():
 def capacidades():
     """Qué funciones están realmente disponibles en ESTE deploy.
 
-    El frontend lo consulta al arrancar para deshabilitar con un motivo, en vez
-    de ofrecer botones que revientan: la auditoría necesita ANTHROPIC_API_KEY, y
-    'Sincronizar wiki' solo sirve si los .md están montados en el contenedor
-    (si no, el camino correcto es importarlos desde un repo o un ZIP).
+    El frontend lo consulta al arrancar y esconde la pestaña de auditoría si el
+    servidor corre sin ANTHROPIC_API_KEY, en vez de ofrecer un formulario que
+    devuelve 500. El camino MCP (`reunir_contexto_auditoria`) no la necesita.
     """
-    bundle = Path(settings.wiki_microservicio_dir)
-    return {
-        "auditoria": bool(settings.anthropic_api_key),
-        "wiki_bundle": bundle.is_dir() and any(bundle.rglob("*.md")),
-    }
+    return {"auditoria": bool(settings.anthropic_api_key)}
 
 
 @app.get("/health", include_in_schema=False)

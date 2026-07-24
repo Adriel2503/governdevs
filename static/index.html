@@ -107,7 +107,7 @@
       </section>
     </div>
 
-    <!-- ==================== 01 · FUENTES ==================== -->
+    <!-- ==================== 02 · FUENTES ==================== -->
     <div class="tab-panel" id="panel-fuentes" role="tabpanel" aria-labelledby="tab-fuentes">
       <section class="workspace-panel" aria-labelledby="credsTitle">
         <div class="panel-header">
@@ -193,7 +193,7 @@
       </section>
     </div>
 
-    <!-- ==================== 02 · ACTIVIDAD ==================== -->
+    <!-- ==================== 03 · ACTIVIDAD ==================== -->
     <div class="tab-panel" id="panel-actividad" role="tabpanel" aria-labelledby="tab-actividad" hidden>
       <section class="workspace-panel" aria-labelledby="actividadTitle">
         <div class="panel-header">
@@ -201,7 +201,7 @@
             <h2 id="actividadTitle">Actividad de sincronización</h2>
             <p>Cada push a la rama vigilada reindexa el grafo; cada pull request recibe una verificación arquitectónica.</p>
           </div>
-          <div class="import-modes" role="group" aria-label="Tipo de actividad">
+          <div class="segmented" role="group" aria-label="Tipo de actividad">
             <button class="secondary btn-sm" id="actTabJobs" type="button" aria-pressed="true">Reindexados</button>
             <button class="secondary btn-sm" id="actTabRevs" type="button" aria-pressed="false">Revisiones de PR</button>
           </div>
@@ -217,17 +217,24 @@
       </section>
     </div>
 
-    <!-- ==================== 03 · LINEAMIENTOS ==================== -->
+    <!-- ==================== 04 · LINEAMIENTOS ==================== -->
+    <!-- Antes esto eran DOS paneles ("Lineamientos oficiales" y "Explorar
+         reglas") que, vacíos, se leían como funciones repetidas. Es una sola
+         tarea en tres momentos — importar, ver qué se cargó, consultarlo — así
+         que va en un panel con separadores. -->
     <div class="tab-panel" id="panel-lineamientos" role="tabpanel" aria-labelledby="tab-lineamientos" hidden>
       <section class="workspace-panel" aria-labelledby="importTitle">
         <div class="panel-header">
           <div>
             <h2 id="importTitle">Lineamientos oficiales</h2>
-            <p>Importa la documentación de arquitectura desde un repositorio o un archivo ZIP, y elige qué carpeta indexar.</p>
+            <p>La documentación de arquitectura que los agentes reciben por MCP, servida verbatim.</p>
           </div>
+          <span class="pill-count" id="reglasCount"></span>
         </div>
         <div class="panel-body">
-          <div class="import-modes" role="group" aria-label="Fuente de los lineamientos">
+          <h3 class="bloque-titulo">Importar</h3>
+          <p class="bloque-ayuda">Desde un repositorio o un ZIP; después elegís qué carpeta indexar.</p>
+          <div class="segmented" role="group" aria-label="Fuente de los lineamientos">
             <button class="secondary btn-sm" id="importModeGit" type="button" aria-pressed="true">Desde repositorio</button>
             <button class="secondary btn-sm" id="importModeZip" type="button" aria-pressed="false">Subir ZIP</button>
           </div>
@@ -246,8 +253,9 @@
           </form>
           <div class="import-result" id="importResult" aria-live="polite"></div>
 
-          <div class="fuentes-bloque">
-            <h3 class="fuentes-titulo">Importaciones cargadas</h3>
+          <div class="bloque">
+            <h3 class="bloque-titulo">Importaciones cargadas</h3>
+            <p class="bloque-ayuda">Cada lote importado, con la carpeta que se indexó. Se puede quitar entero.</p>
             <div class="table-wrap">
               <table id="fuentesTable">
                 <thead>
@@ -257,33 +265,22 @@
               </table>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section class="workspace-panel" aria-labelledby="reglasTitle">
-        <div class="panel-header">
-          <div>
-            <h2 id="reglasTitle">Explorar reglas</h2>
-            <p>Lo que un agente recibe por MCP, servido verbatim. Búsqueda BM25 sobre todo el contenido.</p>
+          <div class="bloque">
+            <h3 class="bloque-titulo">Reglas indexadas</h3>
+            <p class="bloque-ayuda">Lo mismo que devuelve el hub por MCP. La búsqueda es BM25 sobre todo el contenido.</p>
+            <div class="reglas-list" id="reglasList"></div>
+            <form id="buscarForm" class="search-form">
+              <input type="text" id="buscarQuery" placeholder="Buscar una regla o convención" aria-label="Buscar en las reglas" />
+              <button type="submit" class="secondary">Buscar</button>
+            </form>
+            <div class="search-results" id="buscarResults"></div>
           </div>
-          <span class="pill-count" id="reglasCount"></span>
-        </div>
-        <div class="panel-body">
-          <div class="wiki-actions">
-            <button class="secondary" id="syncWikiBtn" type="button">Sincronizar fuente</button>
-            <span class="muted" id="wikiSyncStatus" aria-live="polite"></span>
-          </div>
-          <div class="reglas-list" id="reglasList"></div>
-          <form id="buscarForm" class="search-form">
-            <input type="text" id="buscarQuery" placeholder="Buscar una regla o convención" aria-label="Buscar en las reglas" />
-            <button type="submit" class="secondary">Buscar</button>
-          </form>
-          <div class="search-results" id="buscarResults"></div>
         </div>
       </section>
     </div>
 
-    <!-- ==================== 04 · AUDITORÍA ==================== -->
+    <!-- ==================== 05 · AUDITORÍA ==================== -->
     <div class="tab-panel" id="panel-auditoria" role="tabpanel" aria-labelledby="tab-auditoria" hidden>
       <section class="workspace-panel" id="auditPanel" aria-labelledby="auditTitle">
         <div class="panel-header">
@@ -293,7 +290,6 @@
           </div>
         </div>
         <div class="panel-body">
-          <p class="aviso" id="auditAviso" hidden></p>
           <form id="auditForm">
             <input type="text" id="auditRepo" placeholder="Repositorio registrado" required aria-label="Repositorio a auditar" />
             <input type="text" id="auditModulo" placeholder="Módulo a evaluar" required aria-label="Módulo a evaluar" />

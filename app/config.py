@@ -39,9 +39,6 @@ class Settings(BaseSettings):
     cbm_cli_timeout: int = 120
     cbm_index_timeout: int = 900
 
-    # Lineamientos (wiki bundleada)
-    wiki_microservicio_dir: str = str(PROJECT_ROOT / "wiki_data" / "Microservicio")
-
     # Base de datos (Postgres/ParadeDB). En producción apunta al host interno de
     # Dokploy; en desarrollo, a un Postgres local. Todo pasa por acá, nadie lee
     # os.environ directo. Sin esto, la capa de datos falla al primer uso.

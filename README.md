@@ -28,9 +28,8 @@ de que `detect_changes` pueda diffear ramas. Efecto secundario bueno:
 `get_code_snippet` sigue devolviendo el código fuente.
 
 **Lineamientos** — `.md` indexados con **BM25 en Postgres** (extensión
-`pg_search` de ParadeDB). Se cargan por el importador desde una URL de GitHub o
-un ZIP subido, eligiendo desde qué carpeta indexar; o se montan como volumen de
-solo lectura y se reindexan con `POST /wiki/sync`.
+`pg_search` de ParadeDB). Se cargan **siempre por el importador**, desde una URL
+de GitHub o un ZIP subido, eligiendo desde qué carpeta indexar.
 
 > ⚠️ El contenido de la wiki es **interno de Real Plaza**: `wiki_data/` está en
 > `.gitignore`, no se versiona y no viaja dentro de la imagen.
@@ -220,7 +219,7 @@ responde el sub-app por el recorte de prefijo del Mount de Starlette.
 | `DELETE /repos/{name}` | Borra grafo, webhook en GitHub y clon local. |
 | `POST /webhooks/github` | Receptor: HMAC sobre el **raw body**, ruteo push/PR. |
 | `POST /wiki/import/{git,zip,index}` | Importar lineamientos y elegir la carpeta a indexar. |
-| `POST /wiki/sync` · `GET /wiki/reglas` · `/wiki/buscar` | Reindexar y consultar lineamientos (BM25). |
+| `GET /wiki/reglas` · `/wiki/buscar` · `/wiki/fuentes` | Consultar lineamientos (BM25) y los lotes importados. |
 | `POST /audit` | Auditoría de un módulo con Claude (requiere API key). |
 
 ### Tools MCP

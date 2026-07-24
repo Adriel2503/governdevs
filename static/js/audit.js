@@ -3,6 +3,7 @@
 // claro en vez de un error críptico, y apuntamos al camino MCP.
 
 import { postJSON, el } from "./api.js";
+import { quitarPestana } from "./tabs.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -58,23 +59,14 @@ function bindForm() {
   });
 }
 
-// Deshabilitar con el motivo a la vista, en vez de ocultar el panel: quien ya lo
-// vio antes se pregunta dónde quedó; quien lo ve deshabilitado entiende qué le
-// falta configurar. El camino MCP sigue funcionando sin API key, así que se
-// nombra como alternativa, no como consuelo.
+// Antes esto dejaba la pestaña con el formulario deshabilitado y un aviso. En
+// una demo eso es una pestaña que no cumple: se ve en la navegación, alguien la
+// abre y se encuentra con nada. Sin ANTHROPIC_API_KEY la sacamos entera —
+// vuelve sola en cuanto la variable esté puesta en el deploy. El camino MCP
+// (`reunir_contexto_auditoria`) no depende de esto y sigue disponible.
 export function aplicarCapacidades(caps) {
   if (caps?.auditoria !== false) return;
-
-  const aviso = $("auditAviso");
-  aviso.replaceChildren(
-    el("strong", { text: "Requiere configurar ANTHROPIC_API_KEY. " }),
-    document.createTextNode("Sin ella, ejecutá la auditoría desde tu agente con la herramienta MCP "),
-    el("code", { text: "reunir_contexto_auditoria" }),
-    document.createTextNode(", que entrega el mismo material.")
-  );
-  aviso.hidden = false;
-
-  for (const campo of $("auditForm").elements) campo.disabled = true;
+  quitarPestana("auditoria");
 }
 
 export function initAudit() {
