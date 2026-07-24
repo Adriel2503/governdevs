@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     # os.environ directo. Sin esto, la capa de datos falla al primer uso.
     database_url: str = ""
 
+    # Clave Fernet para cifrar secretos en la BD (PAT, webhook secrets). Vive en
+    # el entorno, nunca en Postgres: si se filtra la BD, no hay secretos en claro.
+    # Generar: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    credentials_key: str = ""
+
+    # URL pública de la app — con esto se arma la URL del webhook que se registra
+    # en GitHub (ej. https://governdevs.midominio.io). Sin esto no hay auto-registro.
+    public_base_url: str = ""
+
     # Auditoría vía Claude (REST /audit, apagado si no hay key)
     anthropic_api_key: str | None = None
 

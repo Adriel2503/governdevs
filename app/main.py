@@ -25,6 +25,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import credenciales
 from . import db as repos_db
 from . import graph_engine as cbm
 from . import importador
@@ -209,6 +210,40 @@ def delete_repo(name: str):
             pass
     repos_db.delete(name)
     return {"deleted": name}
+
+
+# --- Credenciales git (PAT hoy, GitHub App en v3) --------------------------
+# El token se guarda cifrado y NUNCA se devuelve: las respuestas solo llevan
+# metadata. Todo el sistema pide el token vía credenciales.token_para_clonar().
+
+
+class CrearCredencialRequest(BaseModel):
+    alias: str = Field(description="Nombre reconocible, ej. 'Cuenta de Amado (demo)'")
+    token: str = Field(description="Personal Access Token; se guarda cifrado")
+    github_login: str | None = None
+
+
+@app.post("/credenciales")
+def crear_credencial(req: CrearCredencialRequest):
+    try:
+        cid = credenciales.crear_pat(
+            alias=req.alias, token=req.token, github_login=req.github_login
+        )
+    except (credenciales.CredencialError, RuntimeError) as e:
+        raise HTTPException(400, str(e))
+    return {"id": cid, "alias": req.alias, "tipo": "pat"}
+
+
+@app.get("/credenciales")
+def listar_credenciales():
+    return credenciales.listar()
+
+
+@app.delete("/credenciales/{credential_id}")
+def eliminar_credencial(credential_id: str):
+    if not credenciales.eliminar(credential_id):
+        raise HTTPException(404, "Credencial no encontrada")
+    return {"deleted": credential_id}
 
 
 # --- Lineamientos (wiki) ---------------------------------------------------
