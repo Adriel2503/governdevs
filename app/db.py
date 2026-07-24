@@ -20,7 +20,11 @@ _DEFAULT_OWNER = "admin"
 
 _COLS = (
     "name, source, local_path, cbm_project, status, error, registered_at, "
-    "credential_id, rama, watch_paths, last_indexed_commit, last_synced_at"
+    "credential_id, rama, watch_paths, last_indexed_commit, last_synced_at, "
+    # Booleano DERIVADO: dice si el repo tiene webhook sin exponer el id ni,
+    # sobre todo, el secreto. webhook_secret_cifrado no sale por la API bajo
+    # ninguna forma; para eso está datos_webhook(), deliberadamente fuera de acá.
+    "(webhook_github_id IS NOT NULL) AS webhook_activo"
 )
 
 

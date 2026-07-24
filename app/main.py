@@ -39,7 +39,10 @@ from .mcp_server import mcp as mcp_server
 _CAPAS_AUDITORIA = ["endpoints", "ruteo", "handlers", "queries", "validators", "custom-exceptions"]
 
 WORKSPACE = Path(settings.workspace_dir)
-WORKSPACE.mkdir(exist_ok=True)
+# parents=True: WORKSPACE_DIR apunta adentro del volumen (/app/data/workspace) y
+# el padre puede no existir todavía en un deploy nuevo. Sin esto, la app no
+# arranca por un directorio faltante.
+WORKSPACE.mkdir(parents=True, exist_ok=True)
 
 # Clones PERSISTENTES de los repos vigilados. A diferencia de la versión previa
 # (que borraba el working tree tras indexar), estos sobreviven: son la base del
@@ -510,6 +513,22 @@ Responde EXCLUSIVAMENTE con un JSON: {{"findings": [{{"archivo": "...", "linea":
         data = json.loads(match.group(0))
 
     return {"findings": data.get("findings", [])}
+
+
+@app.get("/capacidades")
+def capacidades():
+    """Qué funciones están realmente disponibles en ESTE deploy.
+
+    El frontend lo consulta al arrancar para deshabilitar con un motivo, en vez
+    de ofrecer botones que revientan: la auditoría necesita ANTHROPIC_API_KEY, y
+    'Sincronizar wiki' solo sirve si los .md están montados en el contenedor
+    (si no, el camino correcto es importarlos desde un repo o un ZIP).
+    """
+    bundle = Path(settings.wiki_microservicio_dir)
+    return {
+        "auditoria": bool(settings.anthropic_api_key),
+        "wiki_bundle": bundle.is_dir() and any(bundle.rglob("*.md")),
+    }
 
 
 @app.get("/health", include_in_schema=False)
