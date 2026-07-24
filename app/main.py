@@ -13,19 +13,20 @@ reescribe.
 
 import json
 import re
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
 
 import anthropic
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import credenciales
+from . import cola, credenciales, cripto
 from . import db as repos_db
-from . import git_repo
+from . import git_repo, github_api
 from . import graph_engine as cbm
 from . import importador
 from . import reglas as wiki
@@ -63,6 +64,7 @@ mcp_asgi_app = mcp_server.http_app(path="/")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     cbm.ensure_ui_running(CBM_UI_PORT)
+    cola.arrancar_worker()  # consume los reindexados que dispara el webhook
     async with mcp_asgi_app.lifespan(app):
         yield
 
@@ -111,43 +113,39 @@ def _derive_name(source: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "-", stem).lower() or "repo"
 
 
-def _index_repo_job(name: str, local_path: str):
-    """Corre en background: index_repository puede tardar en repos grandes.
+def _auto_registrar_webhook(name: str, source: str, token: str | None) -> str:
+    """Crea el webhook en GitHub para que los push/PR lleguen solos.
 
-    El clon YA NO se borra al terminar (antes sí, para repos por URL). Los repos
-    vigilados persisten en disco porque el reindexado incremental hace `fetch`
-    sobre ese mismo clon y porque detect_changes necesita la historia para
-    diffear ramas. De paso, get_code_snippet sigue devolviendo el código fuente."""
+    Degrada con gracia: si falla (token sin permiso Webhooks:write, sin URL
+    pública, etc.) el repo queda igualmente registrado y con su grafo — solo se
+    pierde la actualización automática. Se informa el motivo en la respuesta.
+    """
+    if not token:
+        return "omitido: el repo se registró sin credencial"
+    if not settings.public_base_url:
+        return "omitido: falta PUBLIC_BASE_URL (GitHub necesita una URL pública)"
     try:
-        repos_db.set_status(name, "indexando")
-        cbm.index_repository(local_path)
-
-        # cbm nombra sus proyectos con un slug propio derivado de la ruta;
-        # lo resolvemos matcheando root_path contra lo que acabamos de indexar.
-        cbm_project = None
-        for p in cbm.list_projects():
-            if Path(p["root_path"]).resolve() == Path(local_path).resolve():
-                cbm_project = p["name"]
-                break
-
-        # Ancla el grafo a un commit concreto: es la base contra la que el
-        # webhook decidirá qué reindexar.
-        try:
-            commit = git_repo.commit_actual(Path(local_path))
-        except git_repo.GitError:
-            commit = None  # ruta local que no es un repo git
-
-        repos_db.marcar_indexado(name, commit_sha=commit, cbm_project=cbm_project)
-    except cbm.CbmError as e:
-        repos_db.set_status(name, "error", error=str(e))
+        owner, repo = github_api.parse_owner_repo(source)
+        secret = secrets.token_hex(32)
+        hook_id = github_api.crear_webhook(
+            owner,
+            repo,
+            token,
+            url=f"{settings.public_base_url.rstrip('/')}/webhooks/github",
+            secret=secret,
+        )
+        repos_db.guardar_webhook(name, hook_id, cripto.cifrar(secret))
+        return f"registrado (id {hook_id})"
+    except (github_api.GitHubError, RuntimeError) as e:
+        return f"error: {e}"
 
 
 @app.post("/repos")
-def register_repo(req: RegisterRepoRequest, background_tasks: BackgroundTasks):
+def register_repo(req: RegisterRepoRequest):
     name = req.name or _derive_name(req.source)
+    token = None
 
     if _is_git_url(req.source):
-        token = None
         if req.credential_id:
             try:
                 token = credenciales.token_para_clonar(req.credential_id)
@@ -176,9 +174,33 @@ def register_repo(req: RegisterRepoRequest, background_tasks: BackgroundTasks):
         rama=req.rama,
         watch_paths=req.watch_paths,
     )
-    background_tasks.add_task(_index_repo_job, name, str(local_path))
 
-    return {"name": name, "local_path": str(local_path), "rama": req.rama, "status": "registrado"}
+    webhook = (
+        _auto_registrar_webhook(name, req.source, token)
+        if _is_git_url(req.source)
+        else "omitido: no es un repo git"
+    )
+    # El indexado inicial va por la MISMA cola que los reindexados del webhook:
+    # un solo camino, historial completo en index_jobs y cero indexados en
+    # paralelo sobre el mismo repo.
+    job_id = cola.encolar(name, evento="registro_inicial")
+
+    return {
+        "name": name,
+        "local_path": str(local_path),
+        "rama": req.rama,
+        "status": "registrado",
+        "webhook": webhook,
+        "job_id": job_id,
+    }
+
+
+@app.get("/repos/{name}/jobs")
+def repo_jobs(name: str):
+    """Historial de reindexados (los que dispara el webhook y los manuales)."""
+    if repos_db.get(name) is None:
+        raise HTTPException(404, "Repo no registrado")
+    return cola.listar_jobs(name)
 
 
 @app.get("/repos")
@@ -235,6 +257,16 @@ def delete_repo(name: str):
             cbm.delete_project(repo["cbm_project"])
         except cbm.CbmError:
             pass
+
+    # Quitar el webhook de GitHub para no dejarlo huérfano apuntando acá.
+    datos = repos_db.datos_webhook(name)
+    if datos and datos.get("webhook_github_id") and repo.get("credential_id"):
+        try:
+            token = credenciales.token_para_clonar(repo["credential_id"])
+            owner, r = github_api.parse_owner_repo(repo["source"])
+            github_api.borrar_webhook(owner, r, token, datos["webhook_github_id"])
+        except (github_api.GitHubError, credenciales.CredencialError, RuntimeError):
+            pass  # el repo se borra igual; a lo sumo queda un hook inactivo
 
     local_path = repo.get("local_path")
     if local_path and Path(local_path).resolve().is_relative_to(REPOS_DIR.resolve()):

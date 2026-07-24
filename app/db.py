@@ -75,6 +75,24 @@ def marcar_indexado(name: str, commit_sha: str | None = None, cbm_project: str |
         )
 
 
+def guardar_webhook(name: str, hook_id: int | None, secret_cifrado: str | None):
+    with pg.conn() as c:
+        c.execute(
+            "UPDATE repos SET webhook_github_id = %s, webhook_secret_cifrado = %s WHERE name = %s",
+            (hook_id, secret_cifrado, name),
+        )
+
+
+def datos_webhook(name: str) -> dict | None:
+    """Uso INTERNO. Deliberadamente fuera de get()/list_all(): esos alimentan la
+    API y el secreto del webhook no debe salir nunca por ahí."""
+    with pg.conn() as c:
+        return c.execute(
+            "SELECT webhook_github_id, webhook_secret_cifrado FROM repos WHERE name = %s",
+            (name,),
+        ).fetchone()
+
+
 def get(name: str) -> dict | None:
     with pg.conn() as c:
         row = c.execute(f"SELECT {_COLS} FROM repos WHERE name = %s", (name,)).fetchone()

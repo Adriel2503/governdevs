@@ -16,3 +16,11 @@ dependencies = [
     "cryptography>=43,<47",
     "httpx>=0.27,<1",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# La app se importa como paquete `app` desde la raíz del proyecto.
+pythonpath = ["."]
