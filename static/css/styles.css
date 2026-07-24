@@ -316,12 +316,98 @@ td.actions button + button { margin-left: 6px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
 .modal-head h3 { margin: 0; font-size: 14px; }
 .modal-head .modal-path { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.modal-acciones { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .modal-body { overflow-y: auto; padding: 4px 0; }
-.modal-body pre {
+
+/* "Ver original": el .md tal cual está guardado, que es lo que reciben los
+   agentes por MCP. */
+.md-crudo {
   margin: 0; padding: 16px 18px;
   white-space: pre-wrap;
   color: var(--ink);
   font: 12.5px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+/* --- Markdown renderizado (visor de reglas) --- */
+.md { padding: 6px 18px 18px; font-size: 13.5px; line-height: 1.65; }
+.md > :first-child { margin-top: 0; }
+
+.md-h { margin: 22px 0 8px; line-height: 1.3; font-weight: 700; }
+h4.md-h { font-size: 15px; }
+h5.md-h { font-size: 13.5px; }
+h6.md-h { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+/* Los tutoriales de la wiki usan `#` para CADA sección, así que hay muchos del
+   mismo nivel: la línea separa visualmente donde el tamaño ya no alcanza. */
+h4.md-h { padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+
+.md-p { margin: 0 0 11px; }
+.md-hr { margin: 20px 0; border: 0; border-top: 1px solid var(--line); }
+
+.md-lista { margin: 0 0 12px; padding-left: 22px; }
+.md-lista li { margin-bottom: 5px; }
+.md-lista .md-lista { margin: 6px 0 0; }
+.md-lista .md-pre { margin: 8px 0; }
+
+.md-code-inline {
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: break-word;
+}
+
+.md-pre {
+  position: relative;
+  margin: 0 0 13px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  /* Los snippets de C# tienen líneas largas: scrollean ellos, no la página. */
+  overflow-x: auto;
+}
+.md-pre code { font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+/* El lenguaje del fence, como etiqueta. */
+.md-pre[data-lenguaje]::before {
+  content: attr(data-lenguaje);
+  position: absolute; top: 0; right: 0;
+  padding: 2px 7px;
+  border-left: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  border-radius: 0 5px 0 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+}
+
+.md-cita {
+  margin: 0 0 13px; padding: 2px 0 2px 13px;
+  border-left: 3px solid var(--teal);
+  color: var(--muted);
+}
+.md-cita > :last-child { margin-bottom: 0; }
+
+/* Las tablas de datos de la app llevan `min-width: 640px` para que sus columnas
+   no se aplasten. Una tabla del markdown vive dentro del modal (~690px útiles),
+   así que ese mínimo la desbordaba y cortaba la última columna: acá conviene
+   que las celdas envuelvan, no que la tabla se estire. */
+.md-tabla { min-width: 0; margin-bottom: 13px; font-size: 12.5px; }
+.md-tabla th, .md-tabla td { padding: 9px 10px; vertical-align: top; }
+.md-tabla code { overflow-wrap: anywhere; }
+
+.md-a { color: var(--teal-ink); text-decoration: underline; text-underline-offset: 2px; }
+/* Enlace a otra página de la wiki: no navegable desde el hub, pero se lee. */
+.md-a-interno { border-bottom: 1px dotted var(--line-strong); cursor: help; }
+
+.md-img { max-width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); }
+.md-img-falta {
+  display: inline-block;
+  padding: 5px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* --- Toasts --- */
