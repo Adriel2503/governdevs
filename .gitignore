@@ -15,10 +15,12 @@ wheels/
 # Config local con secretos (.env.example SÍ se versiona)
 .env
 
-# Datos de runtime — se regeneran/persisten por volumen en Dokploy.
-# data/      -> repos.db (estado) + wiki_index.db (se reconstruye desde wiki_data/)
-# workspace/ -> clones temporales de repos (se autoborran tras indexar)
-# Ambas carpetas las recrea el código al arrancar.
+# Datos de runtime — persisten por volumen en Dokploy (el estado vive en
+# Postgres, no acá).
+# data/      -> store del grafo de cbm ($HOME) + WORKSPACE_DIR en producción
+# workspace/ -> clones PERSISTENTES de los repos vigilados (el reindexado
+#               incremental hace fetch sobre ellos) y descargas temporales del
+#               importador de lineamientos
 data/
 workspace/
 
