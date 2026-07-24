@@ -38,7 +38,9 @@ const COLUMNAS = {
 
 function estado(valor) {
   const icono = ICONO[valor] ?? "•";
-  return el("span", { class: `badge ${valor}`, text: `${icono} ${valor}` });
+  // con-icono apaga el punto que .badge dibuja por defecto: acá el estado ya lo
+  // comunica el emoji, que además no depende de distinguir colores.
+  return el("span", { class: `badge con-icono ${valor}`, text: `${icono} ${valor}` });
 }
 
 function hora(iso) {
@@ -68,7 +70,7 @@ function filaJob(job) {
 
   return el("tr", {}, [
     el("td", { class: "repo-name", text: job.repo_name }),
-    el("td", { text: job.evento }),
+    el("td", { text: (job.evento || "").replace(/_/g, " ") }),
     el("td", { class: "mono", text: corto(job.commit_sha) }),
     celdaEstado,
     el("td", { text: hora(job.encolado_en) }),

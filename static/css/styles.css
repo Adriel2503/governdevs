@@ -385,10 +385,15 @@ td.actions button + button { margin-left: 6px; }
   align-items: flex-end;
   margin-bottom: 18px;
 }
-.field { display: flex; flex-direction: column; gap: 5px; flex: 0 1 210px; }
+.field { display: flex; flex-direction: column; gap: 5px; flex: 0 1 240px; }
 .field > span { font-size: 11.5px; font-weight: 650; color: var(--muted); }
 .field-grow { flex: 1 1 260px; }
-.field input, .field select { width: 100%; }
+/* Reset obligatorio del flex heredado: los inputs traen `flex: 1 1 260px` para
+   la fila del formulario, pero acá el contenedor es column, así que ese 260px
+   se interpreta como ALTO y deja cajas gigantes. */
+.field input, .field select { width: 100%; flex: 0 0 auto; height: 40px; }
+/* Un alias largo no puede tapar la flecha del select. */
+.field select { text-overflow: ellipsis; padding-right: 28px; }
 
 /* Ayuda de permisos del token: colapsada por defecto para no gritar, pero
    presente justo donde se necesita. */
@@ -414,7 +419,24 @@ td.actions button + button { margin-left: 6px; }
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.file-picker { display: inline-flex; align-items: center; cursor: pointer; }
+/* Autosuficiente a propósito: los estilos de botón cuelgan de `button.secondary`
+   (selector de elemento), así que un <label> no los hereda por más que tenga la
+   clase. Se replican acá para que el disparador del archivo se vea igual. */
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 32px;
+  padding: 5px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background .12s, border-color .12s;
+}
+.file-picker:hover { background: var(--surface-2); }
 .visually-hidden:focus-visible + .file-picker,
 .file-picker:focus-within { outline: 2px solid var(--teal); outline-offset: 2px; }
 
@@ -423,7 +445,10 @@ td.actions button + button { margin-left: 6px; }
 .mini { font-size: 11px; margin-top: 3px; }
 
 /* Estados de jobs y revisiones. Reusan .badge; el color acompaña al ícono, que
-   es lo que comunica el estado sin depender de la vista cromática. */
+   es lo que comunica el estado sin depender de la vista cromática.
+   Con ícono propio sobra el punto que .badge dibuja con ::before — quedaban dos
+   indicadores para lo mismo ("• ✅ ok"). */
+.badge.con-icono::before { display: none; }
 .badge.ok { background: var(--teal-soft); color: var(--teal-ink); }
 .badge.corriendo,
 .badge.generando { background: var(--warning-soft); color: var(--warning-ink); }
