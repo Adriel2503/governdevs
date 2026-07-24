@@ -35,6 +35,47 @@
     </div>
 
     <p class="section-label">Administración de fuentes</p>
+
+    <section class="workspace-panel" aria-labelledby="credsTitle">
+      <div class="panel-header">
+        <div>
+          <h2 id="credsTitle">Credenciales de acceso</h2>
+          <p>Tokens con los que el hub clona los repositorios y registra los webhooks en GitHub.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <form id="credForm" class="register-form">
+          <input type="text" id="credAlias" placeholder="Alias (ej. Cuenta de Amado)" required aria-label="Alias de la credencial" />
+          <input type="password" id="credToken" placeholder="Token de acceso personal" required aria-label="Token de acceso personal" />
+          <input type="text" id="credLogin" class="field-name" placeholder="Usuario de GitHub (opcional)" aria-label="Usuario de GitHub" />
+          <button type="submit">Agregar credencial</button>
+        </form>
+
+        <details class="cred-help">
+          <summary>¿Qué permisos necesita el token?</summary>
+          <p>En GitHub: <strong>Settings → Developer settings → Personal access tokens → Fine-grained</strong>, con acceso a los repositorios que quieras vigilar.</p>
+          <table class="mini-table">
+            <thead><tr><th scope="col">Permiso</th><th scope="col">Para qué</th></tr></thead>
+            <tbody>
+              <tr><td><code>Metadata: read</code></td><td>Obligatorio, GitHub lo agrega solo.</td></tr>
+              <tr><td><code>Contents: read</code></td><td>Clonar el repositorio y traer los cambios.</td></tr>
+              <tr><td><code>Webhooks: read &amp; write</code></td><td>Registrar el webhook. <strong>Sin esto no hay actualización automática.</strong></td></tr>
+              <tr><td><code>Pull requests: read &amp; write</code></td><td>Dejar el veredicto como comentario en el PR.</td></tr>
+            </tbody>
+          </table>
+        </details>
+
+        <div class="table-wrap">
+          <table id="credsTable">
+            <thead>
+              <tr><th scope="col">Alias</th><th scope="col">Tipo</th><th scope="col">GitHub</th><th scope="col">Creada</th><th scope="col">Acciones</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section class="workspace-panel" aria-labelledby="reposTitle">
       <div class="panel-header">
         <div>
@@ -53,11 +94,46 @@
           <input type="text" id="name" class="field-name" placeholder="Identificador (opcional)" aria-label="Identificador del repositorio" />
           <button type="submit">Registrar repositorio</button>
         </form>
+        <div class="register-options">
+          <label class="field">
+            <span>Credencial</span>
+            <select id="repoCredencial" aria-label="Credencial para clonar y registrar el webhook"></select>
+          </label>
+          <label class="field">
+            <span>Rama vigilada</span>
+            <input type="text" id="repoRama" value="main" aria-label="Rama vigilada" />
+          </label>
+          <label class="field field-grow">
+            <span>Rutas vigiladas <span class="muted">(opcional)</span></span>
+            <input type="text" id="repoWatch" placeholder="src/**, *.cs — vacío vigila todo" aria-label="Rutas vigiladas" />
+          </label>
+        </div>
         <div class="table-wrap">
           <table id="reposTable">
             <thead>
-              <tr><th>Repositorio</th><th>Estado</th><th>Nodos</th><th>Aristas</th><th>Acciones</th></tr>
+              <tr><th scope="col">Repositorio</th><th scope="col">Estado</th><th scope="col">Rama</th><th scope="col">Sync</th><th scope="col">Nodos</th><th scope="col">Aristas</th><th scope="col">Acciones</th></tr>
             </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace-panel" aria-labelledby="actividadTitle">
+      <div class="panel-header">
+        <div>
+          <h2 id="actividadTitle">Actividad de sincronización</h2>
+          <p>Cada push a la rama vigilada reindexa el grafo; cada pull request recibe una verificación arquitectónica.</p>
+        </div>
+        <div class="import-modes" role="group" aria-label="Tipo de actividad">
+          <button class="secondary btn-sm" id="actTabJobs" type="button" aria-pressed="true">Reindexados</button>
+          <button class="secondary btn-sm" id="actTabRevs" type="button" aria-pressed="false">Revisiones de PR</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table id="actividadTable">
+            <thead></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -82,7 +158,11 @@
           <button type="submit" class="secondary">Escanear</button>
         </form>
         <form id="importZipForm" class="import-form" hidden>
-          <input type="file" id="importZipFile" accept=".zip" aria-label="Archivo ZIP de la wiki" />
+          <!-- El control nativo de archivos no se puede estilar; se oculta y se
+               dispara desde el label, que sí hereda el diseño del resto. -->
+          <label class="file-picker secondary btn-sm" for="importZipFile">Elegir archivo ZIP</label>
+          <input type="file" id="importZipFile" class="visually-hidden" accept=".zip" aria-label="Archivo ZIP de la wiki" />
+          <span class="muted" id="importZipName">Ningún archivo elegido</span>
           <button type="submit" class="secondary">Escanear ZIP</button>
         </form>
         <div class="import-result" id="importResult" aria-live="polite"></div>
@@ -111,9 +191,10 @@
         <div class="search-results" id="buscarResults"></div>
       </div>
 
-      <div class="subpanel">
+      <div class="subpanel" id="auditPanel">
         <h3>Auditoría de módulo</h3>
         <p class="subpanel-sub">Contrasta código indexado y lineamientos oficiales para priorizar incumplimientos.</p>
+        <p class="aviso" id="auditAviso" hidden></p>
         <form id="auditForm">
           <input type="text" id="auditRepo" placeholder="Repositorio registrado" required aria-label="Repositorio a auditar" />
           <input type="text" id="auditModulo" placeholder="Módulo a evaluar" required aria-label="Módulo a evaluar" />

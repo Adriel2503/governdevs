@@ -89,6 +89,13 @@ export function initImportar() {
   $("importModeGit").addEventListener("click", () => setMode(true));
   $("importModeZip").addEventListener("click", () => setMode(false));
 
+  // El input de archivo está oculto (se dispara desde el label estilado), así
+  // que el nombre del elegido hay que mostrarlo a mano.
+  $("importZipFile").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    $("importZipName").textContent = f ? f.name : "Ningún archivo elegido";
+  });
+
   git.addEventListener("submit", (e) => {
     e.preventDefault();
     const url = $("importUrl").value.trim();

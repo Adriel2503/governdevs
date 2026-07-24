@@ -18,6 +18,22 @@ function displayName(archivo) {
 
 let activeChip = null;
 
+// "Sincronizar fuente" lee los .md bundleados en el contenedor. Si no están
+// montados (el deploy los trata como confidenciales y no los hornea en la
+// imagen), el botón no sirve y el estado vacío tiene que mandar al importador,
+// que es el camino que sí funciona.
+let wikiBundleada = true;
+
+export function aplicarCapacidades(caps) {
+  if (caps?.wiki_bundle !== false) return;
+  wikiBundleada = false;
+
+  const btn = $("syncWikiBtn");
+  btn.disabled = true;
+  btn.setAttribute("title", "No hay lineamientos montados en el servidor: importalos desde un repositorio o un ZIP.");
+  refreshReglas(); // repinta el estado vacío con el texto correcto
+}
+
 async function openRegla(capa, chip) {
   try {
     const detalle = await getJSON(`/wiki/reglas/${encodeURIComponent(capa)}`);
@@ -36,7 +52,14 @@ export async function refreshReglas() {
     const reglas = await getJSON("/wiki/reglas");
     $("reglasCount").textContent = reglas.length ? `${reglas.length} reglas` : "";
     if (!reglas.length) {
-      list.replaceChildren(el("span", { class: "muted", text: "Sin reglas indexadas. Usa “Sincronizar fuente”." }));
+      list.replaceChildren(
+        el("span", {
+          class: "muted",
+          text: wikiBundleada
+            ? "Sin reglas indexadas. Usa “Sincronizar fuente”."
+            : "Sin reglas indexadas. Importalas desde “Lineamientos oficiales”, arriba.",
+        })
+      );
       return;
     }
     list.replaceChildren(

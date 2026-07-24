@@ -58,6 +58,25 @@ function bindForm() {
   });
 }
 
+// Deshabilitar con el motivo a la vista, en vez de ocultar el panel: quien ya lo
+// vio antes se pregunta dónde quedó; quien lo ve deshabilitado entiende qué le
+// falta configurar. El camino MCP sigue funcionando sin API key, así que se
+// nombra como alternativa, no como consuelo.
+export function aplicarCapacidades(caps) {
+  if (caps?.auditoria !== false) return;
+
+  const aviso = $("auditAviso");
+  aviso.replaceChildren(
+    el("strong", { text: "Requiere configurar ANTHROPIC_API_KEY. " }),
+    document.createTextNode("Sin ella, ejecutá la auditoría desde tu agente con la herramienta MCP "),
+    el("code", { text: "reunir_contexto_auditoria" }),
+    document.createTextNode(", que entrega el mismo material.")
+  );
+  aviso.hidden = false;
+
+  for (const campo of $("auditForm").elements) campo.disabled = true;
+}
+
 export function initAudit() {
   bindForm();
 }
